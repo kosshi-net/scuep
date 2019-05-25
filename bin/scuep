@@ -38,7 +38,7 @@ while(true); do
 	# Check if track id is in range
 	if [ ! "$track_id" -ge 1 ] || [ ! "$track_id" -le "$track_count" ]; then
 		echo "Reached end of playlist";
-		track_id=0;
+		track_id=1;
 		echo $track_id > $state/track_id;
 	fi
 
