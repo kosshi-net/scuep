@@ -29,9 +29,9 @@ elif 	[ "$1" = "saveto" ]; then
 		touch "$2";
 
 		url=$(cat "$state/current_url");
-		dublicate=$( cat "$2" | fgrep "$url" );
+		duplicate=$( cat "$2" | fgrep "$url" );
 
-		if [ -z "$dublicate" ]; then
+		if [ -z "$duplicate" ]; then
 			echo "$url" >> "$2";
 		else
 			echo "Track already exists in destination";

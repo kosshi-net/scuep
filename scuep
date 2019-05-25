@@ -1,0 +1,69 @@
+#!/bin/sh
+
+state="/home/$USER/.config/scuep"; 
+mkdir -p $state;
+
+if [ ! -f $1 ]; then
+	mkfifo $state/pipe;
+fi
+
+# Todo
+# Shuffle option
+# Autoplay toggle
+# Repeat toggle
+# Command to exit cleanly
+
+if [ ! -z $1 ]; then
+	file="$1";
+	if [ ! -f $file ]; then
+		echo "Error: cannot access file: $1"
+		exit 1;
+	fi
+	echo "Playing $file"
+	echo 1 > $state/track_id;
+	# Create a copy of the playlist supplied
+	playlist=$(shuf $file);
+	#playlist=$(cat $file);
+	echo "$playlist" > $state/playlist;
+else
+	echo "Resuming";
+fi;
+
+mpv_options="--input-file=$state/pipe --really-quiet --no-video";
+
+while(true); do
+	track_id=$(cat $state/track_id);
+	track_count=$( wc -l < $state/playlist );
+	
+	# Check if track id is in range
+	if [ ! "$track_id" -ge 1 ] || [ ! "$track_id" -le "$track_count" ]; then
+		echo "Reached end of playlist";
+		track_id=1;
+		echo $track_id > $state/track_id;
+	fi
+
+	url=$(head -n $track_id $state/playlist | tail -1);
+	echo "$url" > $state/current_url;
+
+	is_cue=$( echo $url | grep "cue://" );
+	if [ ! -z "$is_cue" ]; then
+
+		path="$(./cue_url_parse path "$url")";
+		chapter="$(./cue_url_parse chapter "$url")";
+
+		title="$(./cue_url_parse title "$url")";
+
+		echo "Playing $track_id / $track_count // $title (cue)";
+		mpv "$path --start=#$chapter --end=#$(($chapter+1)) $mpv_options";
+	else
+		filename=$(echo "$url" | rev | cut -d '/' -f -1 | rev);
+		echo "Playing $track_id / $track_count // $filename";
+		mpv "$url" $mpv_options;
+	fi
+
+	# Read $state again, skip and prev can change it
+	track_id=$(cat $state/track_id);
+	track_id=$((track_id+1));
+	echo $track_id > $state/track_id;
+done;
+rmfifo $state/pipe;

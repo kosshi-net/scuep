@@ -21,17 +21,17 @@ int main( int argc, char **argv ){
 	}
 	char *url = argv[2];
 
-	int  url_length = strlen(url)
-	int  chapter_index = url_length;
+	int url_length = strlen(url);
+	int chapter_index = url_length;
 
 	while(--chapter_index) if( url[chapter_index]=='/' ) break;
 	
 	int chapter_length = url_length-chapter_index;
 	char path_buf[1024] = {0};
-	int  path_bufi = 0;
+	int	path_bufi = 0;
 
 	for( 
-		int i = 6;
+		int i = 6; /* "cue://"*/
 		i < url_length-chapter_length; 
 		path_buf[path_bufi++] = url[i++] 
 	);
