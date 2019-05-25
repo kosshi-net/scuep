@@ -33,7 +33,6 @@ Adds currently playing track to a playlist (if not already). Bind this to your k
 See more with ``./scuep-remote help``
 
 
-
 ## Install
 - Check dependencies
 - Clone the repo
@@ -42,8 +41,9 @@ See more with ``./scuep-remote help``
 
 ## Dependencies
 - [mpv](https://github.com/mpv-player/mpv)
-- [libcue](https://github.com/lipnitsk/libcue)
--- Optional, if you can't be bothered to install it, you can disable it in config.h
+- [libcue](https://github.com/lipnitsk/libcue) 
+  - Optional, if you can't be bothered to install it, you can disable it in config.h
+
 Both should be in repositeries of most distributions.
 
 ## License
