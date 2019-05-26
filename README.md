@@ -56,7 +56,8 @@ scuep-cue-scanner /path/to/your/albums | scuep -
 ### Install
 - Check dependencies
 - Clone the repo and cd to it
-- Run ``sudo make install`` (Installs to /usr/local/bin)
+- ``make`` 
+- ``sudo make install`` (Installs to /usr/local/bin)
 
 ### Uninstall
 - ``sudo make uninstall``

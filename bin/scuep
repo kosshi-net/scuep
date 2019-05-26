@@ -38,9 +38,11 @@ else
 	echo "Resuming";
 fi;
 
+echo "Use 'scuep-remote quit' to exit";
+
 mpv_options="--input-file=$state/pipe --really-quiet --no-video";
 
-while(true); do
+while [ ! -f $state/die ]; do
 	track_id=$(cat $state/track_id);
 	track_count=$( wc -l < $state/playlist );
 	
@@ -70,9 +72,14 @@ while(true); do
 		mpv "$url" $mpv_options;
 	fi
 
-	# Read $state again, skip and prev can change it
+	[ -f $state/die ] && break;
+	[ -f $state/loop ] && continue;
+
+	# Increment track id 
 	track_id=$(cat $state/track_id);
 	track_id=$((track_id+1));
 	echo $track_id > $state/track_id;
 done;
-rmfifo $state/pipe;
+
+rm $state/die;
+rm $state/pipe;
