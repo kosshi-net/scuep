@@ -5,12 +5,12 @@ mkdir -p $state;
 
 cd "$(dirname "$0")";
 
-if [ ! -f ./cue_url_parse ]; then
+if [ ! -f "./cue_url_parse" ]; then
 	echo "Could not find ./cue_url_parse, did you make it?"
 	exit 1;
 fi
 
-if [ ! -f $1 ]; then
+if [ ! -f "$state/pipe" ]; then
 	mkfifo $state/pipe;
 fi
 
@@ -21,17 +21,23 @@ fi
 # Command to exit cleanly
 
 if [ ! -z $1 ]; then
-	file="$1";
-	if [ ! -f $file ]; then
+	file="";
+	if   [ "$1" = "-" ]; then
+		file=$(cat -); # Read stdin
+	elif [ ! -f "$1" ]; then
 		echo "Error: cannot access file: $1"
 		exit 1;
+	else
+		file=$(cat "$1");
 	fi
-	echo "Playing $file"
+
+	echo "Playing new a new playlist"
 	echo 1 > $state/track_id;
 	# Create a copy of the playlist supplied
-	playlist=$(shuf $file);
-	#playlist=$(cat $file);
-	echo "$playlist" > $state/playlist;
+	#playlist=$(shuf $file);
+	#playlist=$(cat $1);
+	echo "$file" > $state/playlist;
+	
 else
 	echo "Resuming";
 fi;

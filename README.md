@@ -13,8 +13,11 @@ Still lacks many basic features, has plenty bugs, not tested at all and generall
 
 ## Usage
 
-Start the "server" with ``./scuep [/path/to/playlist]``.
-If no new playlist is supplied, it will resume from previous state.
+Start the "server" with ``./scuep /path/to/playlist``.
+
+You can also use stdin: ``cat ~/playlist | shuf | ./scuep -``
+
+If no argument is given, player will resume from previous state.
 
 Example of a playlist file:
 ```
