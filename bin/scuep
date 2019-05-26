@@ -10,7 +10,7 @@ if [ ! -f "./cue_url_parse" ]; then
 	exit 1;
 fi
 
-if [ ! -f "$state/pipe" ]; then
+if [ ! -p "$state/pipe" ]; then
 	mkfifo $state/pipe;
 fi
 
@@ -31,12 +31,9 @@ if [ ! -z $1 ]; then
 		file=$(cat "$1");
 	fi
 
-	echo "Playing new a new playlist"
+	echo "Playing a new playlist"
 	echo 1 > $state/track_id;
-	# Create a copy of the playlist supplied
-	#playlist=$(shuf $file);
-	#playlist=$(cat $1);
-	echo "$file" > $state/playlist;
+	echo "$file" > $state/playlist; # Save the input playlist
 	
 else
 	echo "Resuming";

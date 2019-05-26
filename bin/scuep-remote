@@ -1,8 +1,7 @@
 #/bin/sh
 state="$HOME/.config/scuep";
 
-
-if [ ! -f "$state/pipe" ]; then
+if [ ! -p "$state/pipe" ]; then
 	echo "No pipe";
 	exit 1;
 fi
