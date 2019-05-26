@@ -33,14 +33,14 @@ Adds currently playing track to a playlist (if not already). Bind this to your k
 
 See more with ``./scuep-remote help``
 
-## Generating playlists
+### Generating playlists
 There are couple example scripts in ``opt/`` on generating playlists.
 Example:
 ```
 opt/scuep-media-scanner /path/to/your/music >> ~/playlist;
 bin/scuep ~/playlist;
 ```
-``scuep-cue-scanner`` works similairly and mostly works.
+Use ``scuep-cue-scanner`` for .cue files.
 
 ## Install
 - Check dependencies

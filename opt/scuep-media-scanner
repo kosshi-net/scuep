@@ -1,5 +1,7 @@
 #!/bin/sh
 
+cd "$(dirname "$0")";
+
 if [ -z "$1" ]; then
 	echo "Usage: $0 /path/to/media >> playlist";
 fi

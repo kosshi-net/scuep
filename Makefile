@@ -2,10 +2,10 @@ CLFAGS= -Wall `pkg-config --libs --cflags libcue`
 
 all: bin/cue_url_parse opt/cue_path_to_urls
 
-bin/cue_url_parse: cue_url_parse.c;
+bin/cue_url_parse: cue_url_parse.c filehelper.h;
 	gcc cue_url_parse.c $(CLFAGS) -o bin/cue_url_parse
 
-opt/cue_path_to_urls: cue_path_to_urls.c;
+opt/cue_path_to_urls: cue_path_to_urls.c filehelper.h;
 	gcc cue_path_to_urls.c $(CLFAGS) -o opt/cue_path_to_urls
 
 clean:

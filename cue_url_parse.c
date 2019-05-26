@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include "filehelper.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,10 +44,10 @@ int main( int argc, char **argv ){
 
 		#ifdef USE_LIBCUE
 
-		FILE 	*cue 		= fopen(path_buf, "r");
-		if(cue==NULL) 		goto error;
+		char  *string		= scuep_read_file(path_buf);
+		if(string==NULL)	goto error;
 
-		Cd 		*cd 		= cue_parse_file(cue);
+		Cd 		*cd 		= cue_parse_string( string + scuep_bom_length(string) );
 		if(cd==NULL) 		goto error;
 
 		Track 	*track 		= cd_get_track( cd, atoi( url+chapter_index+1 ) );
@@ -55,6 +57,9 @@ int main( int argc, char **argv ){
 		if(text==NULL)		goto error;
 
 		printf("%s\n", cdtext_get( PTI_TITLE, text ));
+
+		cd_delete(cd);
+		free(string);
 
 		#else   // USE_LIBCUE
 

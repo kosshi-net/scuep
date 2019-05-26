@@ -1,5 +1,4 @@
 // scuep config
 
-// Comment the line below to disable libcue.
-// Will disable parsing of track titles
+// Comment the line below to disable cue sheet support
 #define USE_LIBCUE

@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include "filehelper.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,33 +20,28 @@ int main( int argc, char **argv ){
 		return 1;
 	}
 
-	FILE *f = fopen(argv[1], "rb");
-	if(f==NULL) goto error;
-	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET); 
-	char *string = malloc(fsize + 1);
-	if(string==NULL) goto error;
-	fread(string, 1, fsize, f);
-	fclose(f);
-	//FILE 	*cue 		= fopen(argv[1], "r");
-	//if(cue==NULL) 		goto error;
+	//fprintf(stderr, "%s\n", argv[1]);
 
-	Cd 		*cd 		= cue_parse_string(string);
+	char  *string		= scuep_read_file(argv[1]);
+	if(string==NULL) 	goto error;
+
+	Cd 		*cd 		= cue_parse_string( string + scuep_bom_length(string) );
 	if(cd==NULL) 		goto error;
 
 	int 	num_tracks	= cd_get_ntrack(cd);
+	if(num_tracks==0) goto error;
 
 	for( int i = 0; i < num_tracks; i++ )
 		printf("cue://%s/%i\n", argv[1], i+1);
 
+	cd_delete(cd);
+	free(string);
+
 	return 0;
 
 	error:;
-
 	#endif // USE_LIBCUE
 
 	fprintf(stderr, "libcue error %s\n", argv[1]);
-
 	return 1;
 }
