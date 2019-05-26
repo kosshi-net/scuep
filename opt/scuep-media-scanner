@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ -z "$1" ]; then
+	echo "Usage: $0 /path/to/media >> playlist";
+fi
+
+find "$1" \
+	-name "*.mp3" -o \
+	-name "*.wav" -o \
+	-name "*.aac" -o \
+	-name "*.m4a" -o \
+	-name "*.flac" -o \
+	-name "*.mp3"

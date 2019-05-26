@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [ -z "$1" ]; then
+	echo "Usage: $0 /path/to/media >> playlist";
+	exit 1;
+fi
+
+find "$1" -name "*.cue" | while read line; do ./cue_path_to_urls "$line" ; done;

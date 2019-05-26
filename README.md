@@ -3,11 +3,11 @@ A tiny music player with CUE support for Linux.
 
 Uses MPV for the actual playback. This is just a wrapper to give more easy to use control over playback and playlists. Made to be modified and extended. Written mostly in posix-compliant shell and tiny amount of C.
 
-Allows you to handle tracks in .cue sheets individually, like CMUS. This whole program only exists because CMUS [seems to be no longer maintained](https://github.com/cmus/cmus/issues/856) and .cue support [seem to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
+Allows you to handle tracks in .cue sheets individually, like CMUS. This whole program only exists because CMUS [seems to be no longer maintained](https://github.com/cmus/cmus/issues/856) and .cue support [seems to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
 
 Has no user interface, you are expected to generate your playlists yourself and edit them with a text editor.
 
-## WORK IN PROGESS!!
+## WORK IN PROGRESS!!
 Still lacks many basic features, has plenty bugs, not tested at all and generally just not polished. But it works if you don't feed it bad data. DO NOT RUN AS SUDO! And please improve me!
 
 
