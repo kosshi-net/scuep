@@ -1,5 +1,5 @@
 #/bin/sh
-state="/home/$USER/.config/scuep";
+state="$HOME/.config/scuep";
 
 if		[ "$1" = "play" ] || 
 		[ "$1" = "stop" ] || 
@@ -19,7 +19,7 @@ elif 	[ "$1" = "prev" ]; then
 		echo $line > $state/track_id;
 		echo "quit" >> $state/pipe;
 
-elif 	[ "$1" = "saveto" ]; then
+elif 	[ "$1" = "addto" ]; then
 
 		if [ -z "$2" ]; then
 			echo "Usage: $0 $1 path";
@@ -50,6 +50,6 @@ else
 		echo "  Echo url of currently playing file:"
 		echo "   $0 current_url";
 		echo "  Add currently playing song to a playlist:"
-		echo "   $0 saveto <path>";
+		echo "   $0 addto <path>";
 
 fi

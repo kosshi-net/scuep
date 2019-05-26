@@ -31,7 +31,7 @@ int main( int argc, char **argv ){
 	int	path_bufi = 0;
 
 	for( 
-		int i = 6; /* "cue://"*/
+		int i = 6; // length of "cue://"
 		i < url_length-chapter_length; 
 		path_buf[path_bufi++] = url[i++] 
 	);

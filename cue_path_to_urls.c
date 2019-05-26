@@ -8,7 +8,7 @@
 #include <libcue/libcue.h>
 #endif
 
-// A quick and dirty helper for cue sheet parsing to avoid regex and shell mess
+// Gets the count of tracks in a .cue file and prints urls
 
 int main( int argc, char **argv ){
 	#ifdef USE_LIBCUE
@@ -19,13 +19,14 @@ int main( int argc, char **argv ){
 	}
 
 	FILE *f = fopen(argv[1], "rb");
+	if(f==NULL) goto error;
 	fseek(f, 0, SEEK_END);
 	long fsize = ftell(f);
 	fseek(f, 0, SEEK_SET); 
 	char *string = malloc(fsize + 1);
+	if(string==NULL) goto error;
 	fread(string, 1, fsize, f);
 	fclose(f);
-
 	//FILE 	*cue 		= fopen(argv[1], "r");
 	//if(cue==NULL) 		goto error;
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-state="/home/$USER/.config/scuep"; 
+state="$HOME/.config/scuep"; 
 mkdir -p $state;
 
 cd "$(dirname "$0")";
