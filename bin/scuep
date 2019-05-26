@@ -15,7 +15,6 @@ if [ ! -p "$state/pipe" ]; then
 fi
 
 # Todo
-# Shuffle option
 # Autoplay toggle
 # Repeat toggle
 # Command to exit cleanly
