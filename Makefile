@@ -1,32 +1,31 @@
 CLFAGS= -Wall `pkg-config --libs --cflags libcue`
 
 
-all: bin/cue_url_parse opt/cue_path_to_urls
+all: bin/scuep-cue-helper opt/scuep-cue-to-urls
 
-bin/cue_url_parse: cue_url_parse.c filehelper.h;
-	gcc cue_url_parse.c $(CLFAGS) -o bin/cue_url_parse
+bin/scuep-cue-helper: scuep-cue-helper.c filehelper.h;
+	gcc scuep-cue-helper.c $(CLFAGS) -o bin/scuep-cue-helper
 
-opt/cue_path_to_urls: cue_path_to_urls.c filehelper.h;
-	gcc cue_path_to_urls.c $(CLFAGS) -o opt/cue_path_to_urls
+opt/scuep-cue-to-urls: scuep-cue-to-urls.c filehelper.h;
+	gcc scuep-cue-to-urls.c $(CLFAGS) -o opt/scuep-cue-to-urls
 
 .PHONY: clean
 clean:
-	rm bin/cue_url_parse opt/cue_path_to_urls;
+	rm bin/scuep-cue-helper opt/scuep-cue-to-urls;
 
 PREFIX = /usr/local
-
 
 .PHONY: install
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp \
-		"bin/cue_url_parse" \
+		"bin/scuep-cue-helper" \
 		"bin/scuep" \
 		"bin/scuep-remote" \
-		"opt/cue_path_to_urls" \
 		"opt/scuep-cue-scanner" \
 		"opt/scuep-media-scanner" \
+		"opt/scuep-cue-to-urls" \
 		$(DESTDIR)$(PREFIX)/bin 
 
 
@@ -34,9 +33,9 @@ install: all
 .PHONY: uninstall
 uninstall:
 	rm -f \
-		"$(DESTDIR)$(PREFIX)/bin/cue_url_parse" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-helper" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
-		"$(DESTDIR)$(PREFIX)/bin/cue_path_to_urls" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep_cue_scanner" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep_media_scanner" 
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls"  

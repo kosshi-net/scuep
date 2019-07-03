@@ -1,17 +1,17 @@
 #!/bin/sh
 
+SCUEP_VERSION="0.2"
+
 state="$HOME/.config/scuep"; 
 mkdir -p $state;
 
-cd "$(dirname "$0")";
-
-if [ ! -f "./cue_url_parse" ]; then
-	echo "Could not find ./cue_url_parse, did you make it?"
-	exit 1;
-fi
-
 if [ ! -p "$state/pipe" ]; then
 	mkfifo $state/pipe;
+fi
+
+
+if [ ! -f "$state/volume" ]; then
+	echo "100" > $state/volume
 fi
 
 # Todo
@@ -40,9 +40,10 @@ fi;
 
 echo "Use 'scuep-remote quit' to exit";
 
-mpv_options="--input-file=$state/pipe --really-quiet --no-video";
-
 while [ ! -f $state/die ]; do
+
+	mpv_options="--input-file=$state/pipe --really-quiet --no-video --no-input-terminal --volume=$(cat $state/volume)";
+
 	track_id=$(cat $state/track_id);
 	track_count=$( wc -l < $state/playlist );
 	
@@ -59,10 +60,10 @@ while [ ! -f $state/die ]; do
 	is_cue=$( echo $url | grep "cue://" );
 	if [ ! -z "$is_cue" ]; then
 
-		path="$(./cue_url_parse path "$url")";
-		chapter="$(./cue_url_parse chapter "$url")";
-
-		title="$(./cue_url_parse title "$url")";
+		path="$(scuep-cue-helper path "$url")";
+		
+		chapter="$(scuep-cue-helper chapter "$url")";
+		title="$(scuep-cue-helper title "$url")";
 
 		echo "Playing $track_id / $track_count // $title (cue)";
 		mpv "$path" --start=#$chapter --end=#$(($chapter+1)) $mpv_options;
