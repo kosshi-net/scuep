@@ -150,7 +150,7 @@ size_t				 library_wide_size;
 char				*library_char;
 size_t				 library_char_size;
 
-char *basename(char*c){
+char *scuep_basename(char*c){
 	char *last = c;
 	while(*++c != '\0'){
 		if( *c == '/' ) last = c;
@@ -299,7 +299,7 @@ void build_database(char *playlist){
 				char *cue_filename = track_get_filename(track);
 				char cue_path[1024*4];
 				strcpy( cue_path, library[i].path );
-				strcpy( basename(cue_path), cue_filename );
+				strcpy( scuep_basename(cue_path), cue_filename );
 
 				// Use taglib to get the length of the whole file
 				// Usually happens with last tracks in .cue
@@ -340,15 +340,7 @@ void build_database(char *playlist){
 }
 
 
-size_t utf8len(const char *s) {
-    size_t count = 0;
-    while (*s) {
-        count += (*s++ & 0xC0) != 0x80;
-    }
-    return count;
-}
-  
-uint32_t wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
+uint32_t scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
 	size_t width = 0;
 	while(*wc && width < max_width){
 		*dst++ = *wc;
@@ -363,7 +355,7 @@ uint32_t wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
 
 void draw_and_search(uint32_t x, uint32_t y, wchar_t*text, uint32_t LCW, uint32_t options){
 	static wchar_t slicebuf[512]; 
-	uint32_t w = wcslice(slicebuf, text, LCW-2);
+	uint32_t w = scuep_wcslice(slicebuf, text, LCW-2);
 	if( options & TEXT_ALIGN_RIGHT ) x = x + (LCW-2 - w);
 	mvprintw( y, x, "%S", slicebuf );
 	if( w >= LCW-2 ) mvprintw( y, x+LCW-4, "%s", ".." );
@@ -443,7 +435,7 @@ void draw(){
 }
 
 
-void search(){
+void scuep_search(){
 	for (uint32_t i = 0; i < library_items; ++i) {
 		uint32_t j = (selected_id + i + 1) % library_items;
 		if( 
@@ -628,7 +620,7 @@ int input(void){
 				break;
 			case '\n':
 				if( command[0] == '/' ){
-					search();
+					scuep_search();
 					input_mode = MODE_SEARCH;
 				} else {
 					run_command();
@@ -725,7 +717,7 @@ int input(void){
 			case 'N':
 			case 'n':
 				if(command[0] == '/')
-					search();
+					scuep_search();
 				break;
 			case '/':
 			case ':':

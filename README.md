@@ -86,6 +86,7 @@ cue://<path to file>/<track number starting from 1>
 | :              | Enter command (see Commands)  |
 | Esc            | Cancel search/command, refocus on currently playing file* |
 | Left, Right    | Seek 5 seconds |
+| l              | Clear out the display, fixes corruption
 
 * Esc currently responds only after a second
 
