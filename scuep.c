@@ -434,6 +434,23 @@ void draw(){
 	refresh();
 }
 
+int scuep_match( struct LibraryItem *item, wchar_t *match ){
+	return ( 
+		wcsstr( 
+			item->track, 
+			match
+		) || 
+		wcsstr( 
+			item->performer, 
+			match
+		) ||
+		wcsstr( 
+			item->album, 
+			match
+		)
+	);
+}
+
 
 void scuep_search(){
 	for (uint32_t i = 0; i < library_items; ++i) {
@@ -458,6 +475,7 @@ void scuep_search(){
 		}
 	}
 }
+
 void save_playlist(char*playlist){
 	if(nosave) return;
 	FILE * fp;
@@ -528,6 +546,14 @@ void run_command(){
 			shell_item(library+i);
 		}
 		if(!num_marked) shell_item( library+selected_id );
+	}
+
+	if( strstr(command+1, "m/") == command+1 ){
+		for( int i = 0; i < library_items; i++ ){
+			if( scuep_match(library+i, command_wchar+3 ) ) {
+				library[i].marked = 1;
+			}
+		}
 	}
 
 	command_cursor = 0;
