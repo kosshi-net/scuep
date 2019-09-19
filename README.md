@@ -1,26 +1,63 @@
 # SCUEP - Simple CUE Player
-A tiny music player with CUE support for GNU/Linux.
+A simple terminal music player for GNU/Linux.
 
-Uses MPV for audio playback. This is a wrapper to give more easy to use control over playlists and better cue handling. Made to be modified and extended. Written in posix-compliant shell and some C.
+## Still very much WORK IN PROGRESS!
 
-Allows you to handle tracks in .cue sheets individually, like CMUS. This whole program only exists because CMUS [seems to be no longer maintained](https://github.com/cmus/cmus/issues/856) and .cue support [seems to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
+Features:
+- Supports playback for basically every file type imaginable (libmpv)
+- Terminal interface with ncurses
+- Metadata parsing for common filetypes (libtag)
+- CUE parsing and metadata
+- Unicode aware
+- Simple fifo api for remote control
+- sxiv style file marking
+- vim style controls and search
 
-Has no user interface. You are expected to generate and manage playlists yourself, with scripts and a text editor. See [Generating playlists](#generating-playlists). All controlling is done with ``scuep-remote``. I personally just bind its commands to my keyboard.
+Todo:
+- Add an image here
+- Fix bugs and clean up the code
+- Error handling (eg. missing files just segfault)
+- Improve looks
+- Volume controls
+- Test general metadata parsing
+- Improve extensibility
+- Add some basic missing vim/sxiv controls
+- Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
 
-## WORK IN PROGRESS!!
-Still lacks many basic features, might have bugs, not tested at all and generally just not polished. But it works if you don't feed it bad data. Use at your own risk. And please improve me!
+Goals:
+- A player that can read metadata and play most filetypes, and not much else.
+- Simple shell-friendly API to allow you to implement missing features yourself.
+
+
+# Another music player? Why?
+This player was originally made pretty much to play CUE+TTA only because CMUS
+CUE support 
+[seems to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
+I didn't exactly like how CMUS behaved in the first place, and I didn't feel 
+like hunting for a new player that matches my needs for a simple player with 
+support for obscure formats, with easy extensibility.
+
 
 ## Usage
+The player can only play playlists of files, and those playlists cannot be
+modified much at runtime. To load a new playlist, shuffle, or anything else, 
+the program must be restarted with a new playlist. 
 
-Start the "server" with 
+The idea is to let you manage your music library and its organization yourself,
+with existing tools, with as little player specific stuff as possible.
+
+### Starting
 ```
 scuep /path/to/playlist
 ```
 You can also use stdin
 ```
-cat ~/playlist | shuf | scuep -
+shuf ~/playlist | scuep -
 ```
-If no argument is given, player will resume from previous state.
+If no new playlist is given, player will resume from previous state.
+Using ``--nosave`` will not save state (new playlist or playing track).
+You should still not run multiple instances of it, all will attempt to listen
+the same fifo file for remote control.
 
 Accepted playlist format is just absolute paths to files with the exception of CUE:
 ```
@@ -34,18 +71,43 @@ Where CUE URLs are:
 cue://<path to file>/<track number starting from 1>
 ```
 
-Playback can be controlled with 
+### General controls
+| Key            | Action |
+| ---            | --- |
+| 0-9            | Repeat following command where reasonable |
+| j, k, Down, Up | Navigate playlist |
+| Enter          | Play highlighted item |
+| z              | Play previous |
+| c              | Toggle play/pause |
+| b              | Play next |
+| m              | Mark/unmark selected item | 
+| /              | Enter search |
+| n              | Find next item matching the search term |
+| :              | Enter command (see Commands)  |
+| Esc            | Cancel search/command, refocus on currently playing file* |
+| Left, Right    | Seek 5 seconds |
+
+* Esc currently responds only after a second
+
+### Commands
+`:q` to quit. CTRL+C works too currently.
+
+`:!command` to enter a shell command, where % is a path or url of an item.
+The command is run for every single marked item, one by one. If there is no
+marked items, the command is run once for currently selected item.
+Example usage:
+
+`:!echo "%" >> ~/new_playlist;`
+
+
+### Remote
+
+Playback can be controlled locally with
 ```
 scuep-remote <pause/next/prev>
 ```
 
-Example of a cool way to extend this player:
-```
-scuep-remote addto ~/Music/favorites
-```
-Adds currently playing track to a playlist (if not already). Now you have a favorite button that will not add duplicates!
-
-See more with ``scuep-remote help``
+Communication is done with a FIFO in ~/.config/scuep/fifo
 
 ### Generating playlists
 ```
@@ -65,15 +127,13 @@ scuep-cue-scanner /path/to/your/albums | scuep -
 ### Uninstall
 - ``sudo make uninstall``
 
-### Updating
-For uninstalling, remember to use the same version of the Makefile you installed originally with.
-
-
 ## Dependencies
-- [mpv](https://github.com/mpv-player/mpv)
+- ncursesw
+- [libmpv](https://github.com/mpv-player/mpv) 
 - [libcue](https://github.com/lipnitsk/libcue) 
+- [taglib](https://github.com/taglib/taglib)
 
-Both should be in repositeries of most distributions.
+All should be in repositeries of most distributions.
 
 ## License
-MIT
+GPLv2
