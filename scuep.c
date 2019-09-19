@@ -480,7 +480,11 @@ void save_playlist(char*playlist){
 	if(nosave) return;
 	FILE * fp;
 	fp = fopen (playlist_path,"w");
-	fprintf(fp, "%s", playlist);
+	
+	
+	fwrite(playlist, 1, strlen(playlist), fp);
+
+
 	fclose(fp);
 	return;
 }
@@ -841,7 +845,6 @@ int main(int argc, char **argv)
 				break;
 			case option_stdin:
 				playlist = read_stdin();
-				save_playlist(playlist);	
 				new_playlist = 1;
 				break;
 			default:
@@ -895,6 +898,9 @@ int main(int argc, char **argv)
 
 	// Scan files and build DB
 	build_database(playlist);
+	
+	if( new_playlist ) save_playlist(playlist);
+
 	free(playlist);
 	
 	// Start playback
@@ -903,7 +909,7 @@ int main(int argc, char **argv)
 		char *_track_id = read_file(track_id_path);
 		playing_id = atoi(_track_id);
 		free(_track_id);
-	}
+	} 
 	
 
 	fd = open(fifopath, O_RDONLY | O_NONBLOCK);

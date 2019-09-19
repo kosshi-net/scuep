@@ -91,14 +91,17 @@ cue://<path to file>/<track number starting from 1>
 * Esc currently responds only after a second
 
 ### Commands
-`:q` to quit. CTRL+C works too currently.
+`:q` Quit. CTRL+C works too currently.
 
-`:!command` to enter a shell command, where % is a path or url of an item.
+`:m/searchterm` Marks all items that contain the search term. 
+WIP Note: The searching is basic case sensitive substring search currently.
+
+`:!command` Enter a shell command, where % is a path or url of an item.
 The command is run for every single marked item, one by one. If there is no
 marked items, the command is run once for currently selected item.
 Example usage:
 
-`:!echo "%" >> ~/new_playlist;`
+`:!echo '%' >> ~/new_playlist;`
 
 
 ### Remote
