@@ -75,8 +75,8 @@ char     command[128];
 wchar_t  command_wchar[128];
 uint32_t command_cursor = 0;
 
-// vim style repeat
-uint32_t				 repeat = 0;
+uint8_t   delete = 0;
+uint32_t  repeat = 0;
 
 #define MAX_ITEMS (1<<10)
 #define PADX 4
@@ -407,7 +407,15 @@ void draw(){
 		}
 
 		if(selected_id==i){
+			if( selected_id!=playing_id )
+				mvprintw( y, 1, "%s", "~");
 			attron(COLOR_PAIR(1));
+		}
+
+
+		if(library[i].disabled){
+			attron(COLOR_PAIR(4));
+			mvprintw( y, 3, "%s", "#");
 		}
 
 		draw_and_search( PADX+0, 		y,  library[i].track,     32,   0 );
@@ -560,12 +568,27 @@ void run_command(){
 		}
 	}
 
+/*
+	if( strstr(command+1, "saveto") == command+1 ){
+		for( int i = 0; i < library_items; i++ ){
+			if( scuep_match(library+i, command_wchar+3 ) ) {
+				library[i].marked = 1;
+			}
+		}
+	}
+*/
 	command_cursor = 0;
 	command[command_cursor] = 0;
 }
 
+void next(int);
 
 void seekload( struct LibraryItem *item ){
+	if(item->disabled) {
+		next(1); // This will actually end up recursing
+		return;
+	}
+
 	char *mpv_cmd[8]={NULL}; 
 	mpv_cmd[0] = "loadfile"; 
 	mpv_cmd[1] = item->path;
@@ -610,6 +633,7 @@ void prev(int num){
 	seekload( library+playing_id );
 }
 
+int debug_last_key = 0;
 
 // Returns count events processed
 int input(void){
@@ -618,9 +642,12 @@ int input(void){
 	int key = getch();
 	int events = 0;
 	
+	int direction = 1;
+
 	while( key !=  ERR ) {
 		events++;
-
+		
+		debug_last_key = key;
 		
 		if( input_mode == MODE_DEFAULT ) 			goto SWITCH_MODE_DEFAULT;
 		if( input_mode == MODE_COMMAND )	 		goto SWITCH_MODE_COMMAND;
@@ -640,6 +667,8 @@ int input(void){
 				input_mode = MODE_DEFAULT;
 				break;
 			case KEY_BACKSPACE:
+			case '\b':
+			case 127:
 				command_cursor--;
 				command[command_cursor] = 0;
 				if(command_cursor == 0) 
@@ -670,6 +699,13 @@ int input(void){
 
 		switch(key){
 			case 27: // escape
+
+				if( command[0] == '/' ){				
+					command_cursor = 0;
+					command[command_cursor] = 0;
+					command_wchar[command_cursor] = 0;
+					break;
+				}
 
 				if( !selection_follows ){
 					selection_follows = 1;
@@ -711,7 +747,12 @@ int input(void){
 			case 'm':
 				library[selected_id].marked = !library[selected_id].marked;
 				break;
-
+			case 'M':
+				for( int i = 0; i < library_items; i++  ){
+					library[i].marked = !library[i].marked;
+					if(delete) library[i].marked = 0;
+				}
+				break;
 			case 'g':
 				selected_id = repeat;
 				selected_id = (library_items + selected_id) % library_items;
@@ -735,19 +776,42 @@ int input(void){
 				next( MAX( 1, repeat ) );
 				break;
 			case 'c':
-				//system("scuep-remote pause");
 				playpause();
 				break;
-			case 'i':
-				// Focus currently playing
+			case 'd':
+				delete = 1;
+				break;
+			case 'D':;
+				uint32_t num_marked = 0;
+				for( int i = 0; i < library_items; i++ ){
+					if(!library[i].marked) continue;
+					num_marked++;
+					library[i].disabled = !library[i].disabled;
+				}
+				if(!num_marked) 
+					library[selected_id].disabled = !library[selected_id].disabled;
 				break;
 			case 'l':
 				clear();
 				break;
 			case 'N':
+				direction = -1;
 			case 'n':
-				if(command[0] == '/')
-					scuep_search();
+				for( uint32_t i = 1; i < library_items; i++ ){
+					uint32_t j = ( selected_id + i*direction ) % library_items;
+
+					if( command[0] == '/' ){
+						if( !scuep_match(library+j, command_wchar+1) ) continue;
+					} else {
+						if( !library[j].marked ) continue;
+					}
+					
+					selected_id = j;
+					selection_follows = 0;
+					break;
+					
+				}
+				//	scuep_search();
 				break;
 			case '/':
 			case ':':
@@ -764,6 +828,10 @@ int input(void){
 
 		END:
 		timeout(0);
+
+		if(key != 'd')
+			delete = 0;
+
 		key = getch();
 	}
 
@@ -890,11 +958,13 @@ int main(int argc, char **argv)
 	curs_set(FALSE);
 	keypad(stdscr, TRUE);
 	notimeout(stdscr, FALSE);
+	ESCDELAY = 25;
 	use_default_colors();
 	start_color();
 	init_pair(1, 13, -1);
 	init_pair(2, COLOR_BLACK, COLOR_RED);
 	init_pair(3, COLOR_YELLOW, -1);
+	init_pair(4, COLOR_RED, -1);
 
 	// Scan files and build DB
 	build_database(playlist);

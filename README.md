@@ -17,25 +17,30 @@ Todo:
 - Add an image here
 - Fix bugs and clean up the code
 - Error handling (eg. missing files just segfault)
-- Improve looks
 - Volume controls
 - Test general metadata parsing
+- Improve looks
 - Improve extensibility
-- Add some basic missing vim/sxiv controls
+- Improve search (case insensitive, make it search tags and comments etc)
+- Improve and add some basic missing vim/sxiv controls 
+- Improve everything
+- Multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
 - Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
+- Tools or controls to allow reordering playlists efficiently
+- Man pages
 
 Goals:
-- A player that can read metadata and play most filetypes, and not much else.
-- Simple shell-friendly API to allow you to implement missing features yourself.
-
+- A player that can read metadata and play most filetypes, and not much else
+- Simple but powerful controls to allow you to sort your music efficiently 
+- Simple shell-friendly APIs to allow you to implement missing features yourself
 
 # Another music player? Why?
 This player was originally made pretty much to play CUE+TTA only because CMUS
 CUE support 
 [seems to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
-I didn't exactly like how CMUS behaved in the first place, and I didn't feel 
-like hunting for a new player that matches my needs for a simple player with 
-support for obscure formats, with easy extensibility.
+I didn't exactly like how CMUS behaved in the first place, and didn't feel 
+like hunting for a minimal but powerful player that still supports the obscure 
+formats I need.
 
 
 ## Usage
@@ -55,9 +60,6 @@ You can also use stdin
 shuf ~/playlist | scuep -
 ```
 If no new playlist is given, player will resume from previous state.
-Using ``--nosave`` will not save state (new playlist or playing track).
-You should still not run multiple instances of it, all will attempt to listen
-the same fifo file for remote control.
 
 Accepted playlist format is just absolute paths to files with the exception of CUE:
 ```
@@ -70,9 +72,17 @@ Where CUE URLs are:
 ```
 cue://<path to file>/<track number starting from 1>
 ```
+### Flags
+
+`--nosave` Don't save state (new playlist or playing track). 
+You should still not run multiple instances of it, all will attempt to listen
+the same fifo file for remote control.
+
+`-`, `-i` Read playlist from stdin
+
 
 ### General controls
-| Key            | Action |
+| Command        | Action |
 | ---            | --- |
 | 0-9            | Repeat following command where reasonable |
 | j, k, Down, Up | Navigate playlist |
@@ -80,15 +90,22 @@ cue://<path to file>/<track number starting from 1>
 | z              | Play previous |
 | c              | Toggle play/pause |
 | b              | Play next |
-| m              | Mark/unmark selected item | 
+| m              | Toggle mark selected item |
+| M              | Toggle marks on all items |
+| dM             | Unmark all items |
+| D              | Disable all marked items |
 | /              | Enter search |
-| n              | Find next item matching the search term |
+| n, N           | Find next or previous item * |
 | :              | Enter command (see Commands)  |
 | Esc            | Cancel search/command, refocus on currently playing file* |
 | Left, Right    | Seek 5 seconds |
-| l              | Clear out the display, fixes corruption
+| l              | Clear out the display, fixes corruption |
 
-* Esc currently responds only after a second
+* Either an item matching search, if no search active, find a marked item
+
+#### Disabled items
+Items are rendered in red and prefixed with a `#`. These items will be skipped
+when playing. 
 
 ### Commands
 `:q` Quit. CTRL+C works too currently.
@@ -103,6 +120,12 @@ Example usage:
 
 `:!echo '%' >> ~/new_playlist;`
 
+
+### Usage examples
+To play a eg. only a specific album in your current playlist, 
+``:m/Album Name`` (Mark matching) , ``M`` (Reverse marks) , ``D`` (Disable marked)
+
+Wip
 
 ### Remote
 
@@ -137,7 +160,7 @@ scuep-cue-scanner /path/to/your/albums | scuep -
 - [libcue](https://github.com/lipnitsk/libcue) 
 - [taglib](https://github.com/taglib/taglib)
 
-All should be in repositeries of most distributions.
+All should be in repositeries of most distributions, if not already installed.
 
 ## License
 GPLv2
