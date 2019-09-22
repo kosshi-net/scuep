@@ -17,20 +17,19 @@ Todo:
 - Add an image here
 - Fix bugs and clean up the code
 - Error handling (eg. missing files just segfault)
-- Volume controls
+- Volume controls (no keyboard binds atm, use :volume)
 - Test general metadata parsing
 - Improve looks
 - Improve extensibility
 - Improve search (case insensitive, make it search tags and comments etc)
 - Improve and add some basic missing vim/sxiv controls 
 - Improve everything
-- If a lighter alternative to libmpv exists and has similiarly wide format support, use it. This is very unlikely though.
 - Multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
 - Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
 - Tools or controls to allow reordering playlists efficiently
 - Man pages
 
-Goals:
+Goals (and more todo):
 - A player that can read metadata and play most filetypes, and not much else
 - Simple but powerful controls to allow you to sort your music efficiently 
 - Simple shell-friendly APIs to allow you to implement missing features yourself
@@ -83,6 +82,8 @@ the same fifo file for remote control.
 
 
 ### General controls
+These are really terrible! Please suggest improvements!
+
 | Command        | Action |
 | ---            | --- |
 | 0-9            | Repeat following command where reasonable |
@@ -114,6 +115,8 @@ when playing.
 `:m/searchterm` Marks all items that contain the search term. 
 WIP Note: The searching is basic case sensitive substring search currently.
 
+`:volume <integer>` Set volume, number in range 0-100.
+
 `:addto <path>` Append selected items to file. Does not check for duplicates.
 
 `:!command` Enter a shell command, where % is a path or url of an item.
@@ -124,7 +127,7 @@ Example usage:
 
 BUG: $ and ' are valid characters in filenames and 
 can break single and double quotes. This is not handled properly currently.
-Do not use this command for this.
+Do not use this command unless you know what you're doing.
 
 
 ### Usage examples
