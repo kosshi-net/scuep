@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include <wordexp.h>
 
 #include "filehelper.h"
 
@@ -556,9 +557,8 @@ void seekload( struct LibraryItem *item ){
 	mpv_cmd[1] = item->path;
 	mpv_cmd[2] = "replace";
 	mpv_cmd[3] = malloc(16);
-	sprintf( mpv_cmd[3], "start=#%i,end=#%i,volume=%f", 
-		item->chapter, item->chapter+1,
-		output_volume	
+	sprintf( mpv_cmd[3], "start=#%i,end=#%i", 
+		item->chapter, item->chapter+1
 	);
 	mpverr(mpv_command(ctx, (const char**)mpv_cmd)); 
 	free(mpv_cmd[3]);
@@ -600,7 +600,7 @@ void prev(int num){
 
 void set_volume(double volume){
 	double dvol = volume;
-	mpv_set_property(ctx, "volume", MPV_FORMAT_DOUBLE, &dvol);
+	mpverr(mpv_set_property(ctx, "volume", MPV_FORMAT_DOUBLE, &dvol));
 };
 
 
@@ -627,7 +627,23 @@ void run_command(){
 	}
 
 	if( strstr(command+1, "addto") == command+1 ){
-		FILE *fp = fopen( command+strlen(":addto "), "a");
+		
+		wordexp_t p;
+		
+		int err = wordexp( command+strlen(":addto "), &p, 0 );
+		if( err ){
+			sprintf( command, "Error parsing path (wordexpr error %i)", err  );
+			mbstowcs(command_wchar, command, 128 );
+			return;
+		}
+		if( p.we_wordc != 1 ){
+			sprintf( command, "Error parsing path (%li matches, need 1)", p.we_wordc );
+			mbstowcs(command_wchar, command, 128 );
+			return;
+		}
+
+		FILE *fp = fopen( p.we_wordv[0], "a");
+		wordfree(&p);
 
 		if(!fp){
 			sprintf( command, "Error opening file" );
@@ -1028,6 +1044,9 @@ int main(int argc, char **argv)
 	while(read(fd, fifobuf, 128) );
 
 	time_t last_draw = time_ms();
+
+	// volume in seekplay doesnt work on all machines?
+	set_volume(output_volume);
 
 	// Main loop
 	while(1){

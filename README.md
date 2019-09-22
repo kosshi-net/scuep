@@ -99,7 +99,7 @@ These are really terrible! Please suggest improvements!
 | /              | Enter search |
 | n, N           | Find next or previous item * |
 | :              | Enter command (see Commands)  |
-| Esc            | Cancel search/command, refocus on currently playing file* |
+| Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | l              | Clear out the display, fixes corruption |
 
