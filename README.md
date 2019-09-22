@@ -24,6 +24,7 @@ Todo:
 - Improve search (case insensitive, make it search tags and comments etc)
 - Improve and add some basic missing vim/sxiv controls 
 - Improve everything
+- If a lighter alternative to libmpv exists and has similiarly wide format support, use it. This is very unlikely though.
 - Multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
 - Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
 - Tools or controls to allow reordering playlists efficiently
@@ -113,12 +114,17 @@ when playing.
 `:m/searchterm` Marks all items that contain the search term. 
 WIP Note: The searching is basic case sensitive substring search currently.
 
+`:addto <path>` Append selected items to file. Does not check for duplicates.
+
 `:!command` Enter a shell command, where % is a path or url of an item.
 The command is run for every single marked item, one by one. If there is no
 marked items, the command is run once for currently selected item.
 Example usage:
-
 `:!echo '%' >> ~/new_playlist;`
+
+BUG: $ and ' are valid characters in filenames and 
+can break single and double quotes. This is not handled properly currently.
+Do not use this command for this.
 
 
 ### Usage examples
