@@ -11,7 +11,7 @@ opt/scuep-cue-to-urls: scuep-cue-to-urls.c filehelper.h;
 	gcc scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o opt/scuep-cue-to-urls
 
 bin/scuep: scuep.c;
-	gcc scuep.c -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -o bin/scuep
+	gcc scuep.c -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o bin/scuep
 
 .PHONY: clean
 clean:

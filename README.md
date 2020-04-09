@@ -19,6 +19,7 @@ Todo:
 - Error handling (eg. missing files just segfault)
 - Volume controls (no keyboard binds atm, use :volume)
 - Test general metadata parsing
+- Configs
 - Improve looks
 - Improve extensibility
 - Improve search (case insensitive, make it search tags and comments etc)
@@ -112,10 +113,12 @@ when playing.
 ### Commands
 `:q` Quit. CTRL+C works too currently.
 
+
 `:m/searchterm` Marks all items that contain the search term. 
 WIP Note: The searching is basic case sensitive substring search currently.
 
-`:volume <integer>` Set volume, number in range 0-100.
+`:volume <integer>` Set volume in range 0 - 100. Number can be prefixed with 
+`+` or `-` for relative control. 
 
 `:addto <path>` Append selected items to file. Does not check for duplicates.
 
@@ -129,19 +132,28 @@ BUG: $ and ' are valid characters in filenames and
 can break single and double quotes. This is not handled properly currently.
 Do not use this command unless you know what you're doing.
 
+Playback control commands:
+
+`:prev`
+`:next`
+`:pause`
 
 ### Usage examples
-To play a eg. only a specific album in your current playlist, 
+To play eg. only a specific album in your current playlist, 
 ``:m/Album Name`` (Mark matching) , ``M`` (Reverse marks) , ``D`` (Disable marked)
 
 Wip
 
 ### Remote
 
-Playback can be controlled locally with
+Playback can be controlled externally with
 ```
-scuep-remote <pause/next/prev>
+scuep-remote <command>
 ```
+You can run any command listed in Commands.
+Examples:
+`scuep-remote next`
+`scuep-remote volume -5`
 
 Communication is done with a FIFO in ~/.config/scuep/fifo
 

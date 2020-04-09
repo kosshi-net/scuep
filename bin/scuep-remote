@@ -16,9 +16,5 @@ if [ ! -p "$state/fifo" ]; then
 	echo "No pipe";
 	exit 1;
 fi
-
-printf "$@\n"
-echo "$state/fifo"
-printf "$@\n" > "$state/fifo";
-
+echo "$@" > "$state/fifo";
 
