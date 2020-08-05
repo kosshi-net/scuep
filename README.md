@@ -15,14 +15,13 @@ Features:
 
 Todo:
 - Add an image here
-- Fix bugs and clean up the code
-- Error handling (eg. missing files just segfault)
+- Fix bugs
+- CLEAN UP THE CODE JESUS
 - Volume controls (no keyboard binds atm, use :volume)
-- Test general metadata parsing
+- Test! Test! Test! Especially metadata parsing!
 - Configs
 - Improve looks
 - Improve extensibility
-- Improve search (case insensitive, make it search tags and comments etc)
 - Improve and add some basic missing vim/sxiv controls 
 - Improve everything
 - Multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
@@ -42,7 +41,6 @@ CUE support
 I didn't exactly like how CMUS behaved in the first place, and didn't feel 
 like hunting for a minimal but powerful player that still supports the obscure 
 formats I need.
-
 
 ## Usage
 The player can only play playlists of files, and those playlists cannot be
@@ -108,19 +106,20 @@ These are really terrible! Please suggest improvements!
 
 #### Disabled items
 Items are rendered in red and prefixed with a `#`. These items will be skipped
-when playing. 
+when playing. If you deselect all, the player will get really confused.
 
 ### Commands
 `:q` Quit. CTRL+C works too currently.
 
-
 `:m/searchterm` Marks all items that contain the search term. 
-WIP Note: The searching is basic case sensitive substring search currently.
+ Note: Performs a basic case insensitive substring search, no regex etc
 
 `:volume <integer>` Set volume in range 0 - 100. Number can be prefixed with 
 `+` or `-` for relative control. 
 
 `:addto <path>` Append selected items to file. Does not check for duplicates.
+
+`:selfile <path>` Select all items that appear in a playlist file
 
 `:!command` Enter a shell command, where % is a path or url of an item.
 The command is run for every single marked item, one by one. If there is no
@@ -185,3 +184,4 @@ All should be in repositeries of most distributions, if not already installed.
 
 ## License
 GPLv2
+

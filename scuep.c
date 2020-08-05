@@ -25,8 +25,14 @@
 
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 2
-#define SCUEP_VERSION_MINOR 2
+#define SCUEP_VERSION_MINOR 3
 
+/*
+ * Known bugs:
+ * 	After resize stuff might be misaligned, bug with curses? refresh fixes
+ *	If seeking a lot crash might occur
+ *
+ * */
 
 
 time_t time_ms(void);
@@ -146,6 +152,36 @@ char *scuep_basename(char*c){
 	return last+1;
 }
 
+
+
+// Not efficient but works
+wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
+
+	if(!haystack || !*haystack) return 0;
+
+	size_t haystack_len = wcslen(haystack);
+	size_t needle_len = wcslen(haystack);
+
+	wchar_t *haystack_case = calloc( haystack_len+1, sizeof(wchar_t) );
+	wchar_t *needle_case   = calloc( needle_len+1,   sizeof(wchar_t) );
+
+	for( int i = 0; i < haystack_len; i++ )
+		haystack_case[i] = towupper(haystack[i]);
+
+	for( int i = 0; i < needle_len; i++ )
+		needle_case[i] = towupper(needle[i]);
+
+	wchar_t *p = wcsstr( haystack_case, needle_case );
+	
+	free(haystack_case);
+	free(needle_case);
+
+	if(!p) return p;
+	
+	return haystack + (p - haystack_case);
+
+}	
+
 int debug_wide_blocks = 0;
 int debug_char_blocks = 0;
 size_t debug_bytes = 0;
@@ -255,7 +291,7 @@ void build_database(char *playlist){
 
 			library[i].chapter 	 = chapter;
 
-			char  *string = scuep_read_file(library[i].path);
+			char  *string = read_file(library[i].path);
 			if(string == NULL) {
 				endwin();
 				printf("Error: Missing file (item %i)\n", i);
@@ -355,24 +391,32 @@ uint32_t scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
 
 void draw_and_search(
 	uint32_t x, uint32_t y, 
-	wchar_t*text, uint32_t LCW, uint32_t options
+	wchar_t*text, 
+	uint32_t width, 
+	uint32_t options 
 ){
 	static wchar_t slicebuf[512]; 
-	uint32_t w = scuep_wcslice(slicebuf, text, LCW-2);
-	if( options & TEXT_ALIGN_RIGHT ) x = x + (LCW-2 - w);
+	uint32_t w = scuep_wcslice(slicebuf, text, width-2);
+	if( options & TEXT_ALIGN_RIGHT ) x = x + (width-2 - w);
 	mvprintw( y, x, "%S", slicebuf );
-	if( w >= LCW-2 ) mvprintw( y, x+LCW-4, "%s", ".." );
+	if( w >= width-2 ) mvprintw( y, x+width-4, "%s", ".." );
 	wchar_t *substring = NULL;
+
 	if( command[0] == '/' && command_cursor > 1 )
-		substring = wcsstr( text, command_wchar+1 );
+		substring = scuep_wcscasestr( text, command_wchar+1 );
+	
 	if(substring) {
 		attron(COLOR_PAIR(2));
 		ptrdiff_t index = substring - text;
-		mvprintw( y, x+index, "%.*S", command_cursor-1, slicebuf + (index));
+		
+		int hx = x;
+		for( int i = 0; i < index; i++ )
+			hx += wcwidth( slicebuf[i] );
+
+		mvprintw( y, hx, "%.*S", command_cursor-1, slicebuf + (index));
 		attroff(COLOR_PAIR(2));
 	}
 }
-
 
 
 void draw_progress(long start, long length){
@@ -452,10 +496,37 @@ void draw(){
 			attron(COLOR_PAIR(4));
 			mvprintw( y, 3, "%s", "#");
 		}
+	
+		// "Cursors", how much space have been used from each edge?
+		int curleft  = PADX;
+		int curright = col-2;
 
-		draw_and_search( PADX+0, 		y,  library[i].track,     32,   0 );
-		draw_and_search( PADX+32, 		y,  library[i].performer, 32,   0 );
-		draw_and_search( PADX+32+32, y,  library[i].album, col-32-32-PADX-2,  1 );
+		int x, w; 
+		int align= 1;
+
+		x = MAX(curright - 32, curleft + 32*2);
+		w = curright - x;
+		
+		
+		if(w > 7){
+			draw_and_search( x, y,  library[i].album, w, align );
+			align = 0;
+			curright -= w;
+		}
+		
+		x = MAX(curright - 32, curleft + 32);
+		w = curright - x;
+
+		if(w > 7){
+			draw_and_search( x,	y,  library[i].performer, 	w,   align );
+			curright -= w;
+		}
+
+		align = 0; // Draw the track left-aligned anyway
+
+		x = curleft;
+		w = curright - x;
+		draw_and_search( x, y,  library[i].track,     	w,   align );
 
 		attroff(COLOR_PAIR(1));
 	}
@@ -474,9 +545,9 @@ void draw(){
 
 int scuep_match( struct LibraryItem *item, wchar_t *match ){
 	return ( 
-		wcsstr( item->track,     match) || 
-		wcsstr( item->performer, match) ||
-		wcsstr( item->album,     match) 
+		scuep_wcscasestr( item->track,     match) || 
+		scuep_wcscasestr( item->performer, match) ||
+		scuep_wcscasestr( item->album,     match) 
 	);
 }
 
@@ -485,18 +556,7 @@ void scuep_search(){
 	for (uint32_t i = 0; i < library_items; ++i) {
 		uint32_t j = (selected_id + i + 1) % library_items;
 		if( 
-			wcsstr( 
-				library[ j ].track, 
-				command_wchar+1
-			) || 
-			wcsstr( 
-				library[ j ].performer, 
-				command_wchar+1
-			) ||
-			wcsstr( 
-				library[ j ].album, 
-				command_wchar+1
-			)
+			scuep_match( library+j, command_wchar+1 )
 		){
 			selection_follows = 0;
 			selected_id = j;
@@ -549,7 +609,6 @@ int sprinturl( char *dst, struct LibraryItem *item ){
 			item->chapter
 		);
 }
-
 
 int fprinturl( FILE*fp, struct LibraryItem *item){
 	if( item->chapter == -1 )
@@ -708,6 +767,51 @@ void run_command( const char *cmd  ){
 		if(!num_marked)
 			fprinturl(fp, library+selected_id );
 		fclose(fp);
+	}
+
+	if( prefix("selfile", cmd) ){
+
+		wordexp_t p;
+		int err = wordexp( cmd+strlen("selfile "), &p, 0 );
+		if( err ){
+			sprintf( command, "Error parsing path (wordexpr error %i)", err  );
+			mbstowcs(command_wchar, command, 128 );
+			return;
+		}
+		if( p.we_wordc != 1 ){
+			sprintf( command, "Error parsing path (%li matches, need 1)", p.we_wordc );
+			mbstowcs(command_wchar, command, 128 );
+			return;
+		}
+		
+		char *selfile = scuep_read_file( p.we_wordv[0] );
+		wordfree(&p);
+
+		if(!selfile){
+			sprintf( command, "Can't open file" );
+			mbstowcs(command_wchar, command, 128 );
+			return;
+		}
+
+		char *s = selfile;
+		
+		// Replace all newlines with null
+		for( s=selfile-1; *++s; *s*=(*s!='\n') );
+
+		char urlbuf[1024*8];
+		for( int i = 0; i < library_items; i++ ){
+			sprinturl(urlbuf, library+i);
+			s = selfile;
+			while(1){
+				int l = strlen(s);
+				if(l==0) break;  
+				if(strcmp(urlbuf, s)==0) library[i].marked = 1;
+				s+=l+1;
+			}
+		}
+
+		free(selfile);
+
 	}
 
 	if( prefix("volume", cmd) 
@@ -1032,6 +1136,11 @@ int main(int argc, char **argv)
 			default:
 				// Assume its a file
 				playlist = read_file(arg);
+				if(!playlist){
+					printf("Invalid option or file\nscuep --help\n");
+					quit();
+				}
+
 				new_playlist = 1;
 				break;
 		}
@@ -1132,7 +1241,7 @@ int main(int argc, char **argv)
 					next(1);
 				events++;
 			}
-			sprintf(debug, "Debug: %s\n", mpv_event_name(event->event_id));
+			//sprintf(debug, "Debug: %s\n", mpv_event_name(event->event_id));
 		}
 
 		// Process remote
@@ -1170,12 +1279,10 @@ int main(int argc, char **argv)
 			selected_id = playing_id;
 
 		draw();
-		/*
-		mvprintw(0, 40, debug);
+		/*mvprintw(0, 40, debug);
 		mvprintw(0,40+30, "fifo: %s", fifobuf);
 		mvprintw(0,40+40, "c%i w%i (%iKB)", debug_char_blocks, debug_wide_blocks, 
-		debug_bytes / 1024);
-		*/
+		debug_bytes / 1024);*/
 	}
 	quit();
 }

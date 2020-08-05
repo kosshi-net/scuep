@@ -1,5 +1,16 @@
 #!/bin/sh
 
+path=""
+case "$1" in
+  /*) #absolute path 
+  	path="$1"
+  ;;
+  *) #something else"
+  	path=$(realpath "$PWD/$1")
+  	
+  ;;
+esac
+
 cd "$(dirname "$0")";
 
 if [ -z "$1" ]; then
@@ -7,4 +18,4 @@ if [ -z "$1" ]; then
 	exit 1;
 fi
 
-find "$1" -name "*.cue" | while read line; do ./scuep-cue-to-urls "$line" ; done;
+find "$path" -name "*.cue" | while read line; do ./scuep-cue-to-urls "$line" ; done;
