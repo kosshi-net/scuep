@@ -1,15 +1,26 @@
 #!/bin/sh
 
+path=""
+case "$1" in
+  /*) #absolute path 
+  	path="$1"
+  ;;
+  *) #something else"
+  	path=$(realpath "$PWD/$1")
+  ;;
+esac
+
 cd "$(dirname "$0")";
 
 if [ -z "$1" ]; then
 	echo "Usage: $0 /path/to/media >> playlist";
 fi
 
-find "$1" \
+find "$path" \
 	-name "*.mp3" -o \
 	-name "*.wav" -o \
 	-name "*.aac" -o \
 	-name "*.m4a" -o \
 	-name "*.flac" -o \
 	-name "*.mp3"
+

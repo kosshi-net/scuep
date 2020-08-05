@@ -181,6 +181,7 @@ scuep-cue-scanner /path/to/your/albums | scuep -
 - [taglib](https://github.com/taglib/taglib)
 
 All should be in repositeries of most distributions, if not already installed.
+Scripts in opt/ may have additional requirements.
 
 ## License
 GPLv2
