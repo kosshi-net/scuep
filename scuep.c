@@ -20,6 +20,8 @@
 
 #include "filehelper.h"
 
+#include "util.h"
+
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
@@ -37,7 +39,6 @@
 
 time_t time_ms(void);
 char *read_file(char*);
-char *scuep_basename(char*);
 void build_database(char*);
 
 
@@ -45,7 +46,6 @@ void build_database(char*);
 char track_id_path[1024];
 char playlist_path[1024];
 char volume_path  [1024];
-
 
 bool nosave = 0;
 
@@ -110,28 +110,8 @@ time_t time_ms(){
     return t.tv_sec*1000+t.tv_usec/1000;
 }
 
-char *read_file(char *path){
-	FILE *f = fopen(path, "r");
-
-	if(f==NULL) return NULL;
-
-	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET); 
-
-	char *string = calloc(fsize + 16, 1 );
-	if(string==NULL) return NULL;
-
-	fread(string, 1, fsize, f);
-	fclose(f);
-
-	return string;
-}
-
-
 wchar_t *library_wide;
 size_t   library_wide_size;
-
 
 
 void cleanup(){
@@ -144,43 +124,6 @@ void cleanup(){
 char    *library_char;
 size_t   library_char_size;
 
-char *scuep_basename(char*c){
-	char *last = c;
-	while(*++c){
-		if( *c == '/' ) last = c;
-	}
-	return last+1;
-}
-
-
-
-// Not efficient but works
-wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
-
-	if(!haystack || !*haystack) return 0;
-
-	size_t haystack_len = wcslen(haystack);
-	size_t needle_len = wcslen(haystack);
-
-	wchar_t *haystack_case = calloc( haystack_len+1, sizeof(wchar_t) );
-	wchar_t *needle_case   = calloc( needle_len+1,   sizeof(wchar_t) );
-
-	for( int i = 0; i < haystack_len; i++ )
-		haystack_case[i] = towupper(haystack[i]);
-
-	for( int i = 0; i < needle_len; i++ )
-		needle_case[i] = towupper(needle[i]);
-
-	wchar_t *p = wcsstr( haystack_case, needle_case );
-	
-	free(haystack_case);
-	free(needle_case);
-
-	if(!p) return p;
-	
-	return haystack + (p - haystack_case);
-
-}	
 
 int debug_wide_blocks = 0;
 int debug_char_blocks = 0;
@@ -224,11 +167,13 @@ void build_database(char *playlist){
 		c++;
 
 		char *url = line_buf;
+
+		
 		
 		#define DEBUG 1
 
 		//if( i%10 == 0 ){
-		if( 1 ){
+		if( 0 ){
 			erase();
 			char *str = "Parsing metadata ...";
 
@@ -291,7 +236,7 @@ void build_database(char *playlist){
 
 			library[i].chapter 	 = chapter;
 
-			char  *string = read_file(library[i].path);
+			char  *string = scuep_read_file(library[i].path);
 			if(string == NULL) {
 				endwin();
 				printf("Error: Missing file (item %i)\n", i);
@@ -326,6 +271,10 @@ void build_database(char *playlist){
 				library[i].length = taglib_audioproperties_length( tl_prop ) - library[i].start;
 			}
 		}else{ // Misc file, use taglib
+			
+			// TODO: Make sure the path is valid properly!
+			if( url[0] != '/' ) continue;
+
 			// Copy path
 			library[i].path = library_char+ci;
 			for (
@@ -375,18 +324,6 @@ void build_database(char *playlist){
 		library_items++;
 	}	
 }
-
-// Copies characters, calculating their width, until max_width is reached
-uint32_t scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
-	size_t width = 0;
-	while(*wc && width < max_width){
-		*dst++ = *wc;
-		width += wcwidth( *wc++ );
-	}
-	*dst++ = 0;
-	return width;
-}
-
 #define TEXT_ALIGN_RIGHT (1<<0)
 
 void draw_and_search(
@@ -474,17 +411,14 @@ void draw(){
 		if( y + 4 > (uint32_t)row ) break;
 
 
-		if(library[i].marked){
+		if(library[i].marked)
 			mvprintw( y, 2, "%s", "*");
-		}
 
-		if(playing_id==i){
+		if(playing_id==i)
 			mvprintw( y, 1, "%s", ">");
-		}
 
-		if(library[i].warning){
+		if(library[i].warning)
 			attron(COLOR_PAIR(3));
-		}
 
 		if(selected_id==i){
 			if( selected_id!=playing_id )
@@ -506,7 +440,6 @@ void draw(){
 
 		x = MAX(curright - 32, curleft + 32*2);
 		w = curright - x;
-		
 		
 		if(w > 7){
 			draw_and_search( x, y,  library[i].album, w, align );
@@ -573,6 +506,7 @@ void save_playlist(char*playlist){
 	fclose(fp);
 	return;
 }
+
 void save_state(){
 	if(nosave) return;
 	FILE * fp;
@@ -586,6 +520,7 @@ void save_state(){
 	fclose (fp);
 	return;
 }
+
 void quit(){
 	endwin();
 	cleanup();
@@ -701,10 +636,6 @@ void set_volume(double volume){
 	mpverr(mpv_set_property(ctx, "volume", MPV_FORMAT_DOUBLE, &dvol));
 };
 
-bool prefix(const char *pre, const char *str){
-    return strncmp(pre, str, strlen(pre)) == 0;
-}
-
 void run_command( const char *cmd  ){
 
 	if( prefix("next" ,cmd)) next(1);
@@ -784,7 +715,7 @@ void run_command( const char *cmd  ){
 			return;
 		}
 		
-		char *selfile = scuep_read_file( p.we_wordv[0] );
+		char *selfile = read_file( p.we_wordv[0] );
 		wordfree(&p);
 
 		if(!selfile){
@@ -1081,23 +1012,6 @@ enum CLIOptions parse_cli_option( char* str ){
 }
 
 
-char *read_stdin(){
-	size_t buffer_size = 1024*4; 
-	size_t buffer_index = 0;
-	char *buffer = malloc(buffer_size);
-	int c = 0;
-	while( (c = getchar()) != EOF ) {
-		buffer[buffer_index++] = c;
-		if(buffer_index == buffer_size){
-			buffer_size*=2;
-			buffer = realloc(buffer, buffer_size);
-		}
-	}
-	return buffer;
-}
-
-
-
 int main(int argc, char **argv)
 {
 	// Build path vars
@@ -1286,3 +1200,4 @@ int main(int argc, char **argv)
 	}
 	quit();
 }
+

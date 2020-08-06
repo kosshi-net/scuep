@@ -41,7 +41,7 @@ void scuep_remove_rems(char *string){
 	string[i] = *c; // Null
 }
 
-
+// Rename this!! Only use for reading cue files! 
 char *scuep_read_file(char *path){
 	FILE *f = fopen(path, "r");
 
@@ -69,3 +69,4 @@ char *scuep_read_file(char *path){
 
 	return string;
 }
+
