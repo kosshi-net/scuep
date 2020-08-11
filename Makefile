@@ -5,17 +5,20 @@ TAGLIB=`pkg-config --libs --cflags taglib_c`
 
 CLFAGS=-Wall 
 
+src = scuep.c util.c log.c
+obj = $(src:.c=.o)
+
 all: bin/scuep  opt/scuep-cue-to-urls
 
 opt/scuep-cue-to-urls: scuep-cue-to-urls.c filehelper.h;
 	gcc scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o opt/scuep-cue-to-urls
 
-bin/scuep: scuep.c util.c;
-	gcc scuep.c util.c -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o bin/scuep
+bin/scuep: $(obj);
+	gcc $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o $@
 
 .PHONY: clean
 clean:
-	rm opt/scuep-cue-to-urls bin/scuep
+	rm $(obj) opt/scuep-cue-to-urls bin/scuep
 
 PREFIX = /usr/local
 

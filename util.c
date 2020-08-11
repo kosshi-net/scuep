@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -18,7 +19,7 @@
  * Some of these are defined in some systems, prefix with scuep!
  * */
 
-// Strips directory from filename
+// Returns a pointer to the filename of the provided path
 char *scuep_basename(char*c){
 	char *last = c;
 	while(*++c){

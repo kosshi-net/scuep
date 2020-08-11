@@ -1,9 +1,11 @@
-#define _XOPEN_SOURCE_EXTENDED
+#define _XOPEN_SOURCE 
 #include <ncurses.h>
 #include <taglib/tag_c.h>	
 #include <libcue/libcue.h>
 #include <mpv/client.h>
 #include <pthread.h>
+
+#include <wchar.h> 
 
 #include <locale.h>
 #include <fcntl.h>
@@ -13,6 +15,7 @@
 #include <stdbool.h>
 #include <poll.h>
 
+
 #include <sys/stat.h>
 #include <sys/time.h>
 
@@ -21,20 +24,16 @@
 #include "filehelper.h"
 
 #include "util.h"
+#include "log.h"
+
+
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #define SCUEP_TITLE "scuep"
-#define SCUEP_VERSION_MAJOR 2
-#define SCUEP_VERSION_MINOR 3
-
-/*
- * Known bugs:
- * 	After resize stuff might be misaligned, bug with curses? refresh fixes
- *	If seeking a lot crash might occur
- *
- * */
+#define SCUEP_VERSION_MAJOR 0
+#define SCUEP_VERSION_MINOR 24
 
 
 time_t time_ms(void);
@@ -99,7 +98,7 @@ wchar_t  command_wchar[MAX_CMD_LEN];
 uint32_t command_cursor = 0;
 
 uint8_t   input_delete = 0;
-uint32_t  repeat = 0;
+int32_t  repeat = 0;
 
 
 #define PADX 4
@@ -119,10 +118,27 @@ void cleanup(){
 		free(library);
 		library = NULL;
 	}
+	scuep_log_stop();
 }
 
 char    *library_char;
 size_t   library_char_size;
+
+
+int current_track_progress(){
+	int seconds = 0; 
+
+	char *receive = mpv_get_property_string(ctx, "playback-time");
+	if(receive)
+		seconds = atoi(receive) - library[playing_id].start;
+
+	return seconds;
+};
+
+int current_track_length(){
+	return library[playing_id].length;
+};
+
 
 
 int debug_wide_blocks = 0;
@@ -168,12 +184,8 @@ void build_database(char *playlist){
 
 		char *url = line_buf;
 
-		
-		
-		#define DEBUG 1
-
-		//if( i%10 == 0 ){
-		if( 0 ){
+		// TODO: Launch option to disable this, in case this slows down loading
+		if( 1 ){
 			erase();
 			char *str = "Parsing metadata ...";
 
@@ -187,8 +199,8 @@ void build_database(char *playlist){
 		}
 
 		// Make sure we have enough memory
-		// If no, alloc a new block
-		// Previous one is leaked currently !!
+		// If not, alloc a new block
+		// Previous one is "leaked" currently !!
 		if( ci + MAX_STR_LEN * 1 >= library_char_size ){
 			library_char = malloc( library_char_size * sizeof(char) );
 			ci = 0;
@@ -267,13 +279,11 @@ void build_database(char *playlist){
 				strcpy( scuep_basename(cue_path), cue_filename );
 
 				tl_file = taglib_file_new( cue_path );
-				const TagLib_AudioProperties *tl_prop = taglib_file_audioproperties( tl_file );
+				const TagLib_AudioProperties *tl_prop = taglib_file_audioproperties( tl_file ); 
 				library[i].length = taglib_audioproperties_length( tl_prop ) - library[i].start;
 			}
 		}else{ // Misc file, use taglib
 			
-			// TODO: Make sure the path is valid properly!
-			if( url[0] != '/' ) continue;
 
 			// Copy path
 			library[i].path = library_char+ci;
@@ -285,6 +295,14 @@ void build_database(char *playlist){
 			library_char[ci++] = '\0';
 
 			tl_file     = taglib_file_new( url );
+			if(tl_file == NULL) {
+				endwin();
+				printf("Error: Missing file (item %i)\n", i);
+				printf("Path: %s\n", library[i].path);
+
+				cleanup();
+				exit(1);
+			}
 			TagLib_Tag  *tl_tag = taglib_file_tag( tl_file );
 			utf8_title  = taglib_tag_title (tl_tag);
 			utf8_artist = taglib_tag_artist(tl_tag);
@@ -300,6 +318,8 @@ void build_database(char *playlist){
 		if(!utf8_album)  utf8_album = "";
 		if(!utf8_title)  utf8_title = "";
 		if(!utf8_artist) utf8_artist = "";
+
+		if( !utf8_title[0] )  utf8_title = scuep_basename(url);
 
 		library[i].album = library_wide+wi;
 		wi += mbstowcs(library_wide+wi, utf8_album, MAX_STR_LEN-1 );
@@ -355,7 +375,6 @@ void draw_and_search(
 	}
 }
 
-
 void draw_progress(long start, long length){
 
 	char *receive = mpv_get_property_string(ctx, "playback-time");
@@ -363,9 +382,7 @@ void draw_progress(long start, long length){
 	int length_seconds = length;
 	int start_seconds = start;
 
-	int mpv_seconds = 0;
-	if(receive)
-		mpv_seconds = atoi( receive ) - start_seconds;
+	int mpv_seconds = current_track_progress();
 
 	char *volstr = "Volume:  ..%";
 	int vollen = strlen(volstr);
@@ -390,9 +407,13 @@ void draw_progress(long start, long length){
 	if(receive) mpv_free(receive);
 }
 
+
 uint8_t blink = 0;
 uint8_t blink_read = 0;
 
+
+// Wasteful! Especially search highlighting is expensive-ish
+// TODO: Only redraw objects that actually need redrawing!
 void draw(){
 	erase();
 
@@ -466,7 +487,7 @@ void draw(){
 
 	mvprintw( 1, PADX, "Playlist %i/%i ", selected_id, library_items );
 	blink = !blink;
-	mvprintw( 1, col-strlen(SCUEP_TITLE)-PADX - 4, "scuep %i.%i", 
+	mvprintw( 1, col-strlen(SCUEP_TITLE)-PADX - 5, "scuep %i.%i", 
 		SCUEP_VERSION_MAJOR,
 		SCUEP_VERSION_MINOR
 	);
@@ -531,13 +552,14 @@ void mpverr( int status  ){
 	if(status < 0){
 		endwin();
 		printf("MPV API error: %s\n", mpv_error_string(status));
+		cleanup();
 		exit(0);
 	}	
 }
 
 int sprinturl( char *dst, struct LibraryItem *item ){
 	if( item->chapter == -1 )
-		return sprintf(dst, item->path );
+		return sprintf(dst, "%s", item->path );
 	else
 		return sprintf(dst, "cue://%s/%i", 
 			item->path,
@@ -608,14 +630,20 @@ void seekload( struct LibraryItem *item ){
 	return;
 }
 
-char debug[128] = {0};
 
 void seek(int seconds){
+
+	int new_pos = current_track_progress() + seconds; 
+	int max = current_track_length(); 
+
+	if( new_pos > max ) return next(1);
+	if( new_pos < 0   ) seconds -= new_pos;
+
 	char *mpv_cmd[8]={NULL}; 
 	mpv_cmd[0] = "seek"; 
 	mpv_cmd[1] = malloc(16);
 	sprintf( mpv_cmd[1], "%i", seconds );
-	mpverr(mpv_command(ctx, (const char**)mpv_cmd)); 
+	mpverr( mpv_command(ctx, (const char**)mpv_cmd) ); 
 	free(mpv_cmd[1]);
 }
 
@@ -637,6 +665,8 @@ void set_volume(double volume){
 };
 
 void run_command( const char *cmd  ){
+
+	scuep_logf( "Command: %s", cmd );
 
 	if( prefix("next" ,cmd)) next(1);
 	if( prefix("prev" ,cmd)) prev(1);
@@ -681,29 +711,42 @@ void run_command( const char *cmd  ){
 		}
 
 		FILE *fp = fopen( p.we_wordv[0], "a");
-		wordfree(&p);
 
 		if(!fp){
 			sprintf( command, "Error opening file" );
 			mbstowcs(command_wchar, command, 128 );
+			wordfree(&p);
 			return;
 		}
 		
+		int num_written = 0;
 		int num_marked = 0;
 		for( int i = 0; i < library_items; i++ ){
 			if(!library[i].marked) continue;
 			num_marked++;
+			num_written++;
 			fprinturl(fp, library+i );
 		}
-		if(!num_marked)
+
+		
+		if(!num_marked){
 			fprinturl(fp, library+selected_id );
+			num_written++;
+		}
+
+		sprintf( command, "Written %i lines to %s", num_written, p.we_wordv[0]);
+		mbstowcs(command_wchar, command, 128 );
+
+		wordfree(&p);
 		fclose(fp);
+
+		return;
 	}
 
-	if( prefix("selfile", cmd) ){
+	if( prefix("mfile", cmd) ){
 
 		wordexp_t p;
-		int err = wordexp( cmd+strlen("selfile "), &p, 0 );
+		int err = wordexp( cmd+strlen("mfile "), &p, 0 );
 		if( err ){
 			sprintf( command, "Error parsing path (wordexpr error %i)", err  );
 			mbstowcs(command_wchar, command, 128 );
@@ -715,24 +758,24 @@ void run_command( const char *cmd  ){
 			return;
 		}
 		
-		char *selfile = read_file( p.we_wordv[0] );
+		char *mfile = read_file( p.we_wordv[0] );
 		wordfree(&p);
 
-		if(!selfile){
+		if(!mfile){
 			sprintf( command, "Can't open file" );
 			mbstowcs(command_wchar, command, 128 );
 			return;
 		}
 
-		char *s = selfile;
+		char *s = mfile;
 		
 		// Replace all newlines with null
-		for( s=selfile-1; *++s; *s*=(*s!='\n') );
+		for( s=mfile-1; *++s; *s*=(*s!='\n') );
 
 		char urlbuf[1024*8];
 		for( int i = 0; i < library_items; i++ ){
 			sprinturl(urlbuf, library+i);
-			s = selfile;
+			s = mfile;
 			while(1){
 				int l = strlen(s);
 				if(l==0) break;  
@@ -741,7 +784,7 @@ void run_command( const char *cmd  ){
 			}
 		}
 
-		free(selfile);
+		free(mfile);
 
 	}
 
@@ -866,6 +909,16 @@ int input(void){
 				repeat=0;
 				break;
 
+			case '-':
+				repeat = - (repeat || 1 );
+			case '+':
+			case '=':
+				if(repeat == 0) repeat++;
+				output_volume += 5.0 * repeat;
+				output_volume = MIN(MAX(output_volume, 0.00), 100.0);
+				set_volume( output_volume );
+				repeat = 0;
+				break;
 			case '1': case '2': case '3': 
 			case '4': case '5': case '6': 
 			case '7': case '8': case '9':
@@ -983,34 +1036,49 @@ int input(void){
 
 
 
-enum CLIOptions {
-	option_default,
-	option_help,
-	option_version,
-	option_nosave,
-	option_stdin
+enum Flag {
+	flag_default,
+	flag_help,
+	flag_version,
+	flag_nosave,
+	flag_debug,
+	flag_stdin
 };
 
-enum CLIOptions parse_cli_option( char* str ){
-	if( strcmp( str, "--help"
-	)==0) return option_help;
 
-	if( strcmp( str, "--version"
-	)==0) return option_version;
+enum Flag parse_flag( char* str ){
+	if(strcmp(str, "--help"
+	)==0) return flag_help;
+	if(strcmp(str, "--version"
+	)==0) return flag_version;
+	if(strcmp(str, "--nosave"
+	)==0) return flag_nosave;
+	if(strcmp(str, "--debug"
+	)==0) return flag_debug;
 
-	if( strcmp( str, "-v"
-	)==0) return option_nosave;
-	if( strcmp( str, "--nosave"
-	)==0) return option_nosave;
+	if(strcmp(str, "-"
+	)==0) return flag_stdin;
+	if(strcmp(str, "-i"
+	)==0) return flag_stdin;
 
-	if( strcmp( str, "-"
-	)==0) return option_stdin;
-	if( strcmp( str, "-i"
-	)==0) return option_stdin;
-
-	return option_default;
+	return flag_default;
 }
 
+#define HELP_MESSAGE \
+"SCUEP - Simple CUE Player\n\n" \
+"The player is in an early development state.\n" \
+"Please visit https://github.com/kosshishub/scuep for updates and additional\n" \
+"help and usage examples.\n" \
+"--help\n" \
+"    Display help\n" \
+"--version\n" \
+"    Print version\n" \
+"--debug\n" \
+"    Enable logging with Syslog\n" \
+"--nosave\n" \
+"    Don't overwrite playlist saved in .config\n" \
+"-i, -\n" \
+"    Read playlist from stdin\n" 
 
 int main(int argc, char **argv)
 {
@@ -1025,14 +1093,14 @@ int main(int argc, char **argv)
 
 	for(int i = 1; i < argc; i++){
 		char*arg = argv[i];
-		enum CLIOptions flag = parse_cli_option(arg);
+		enum Flag flag = parse_flag(arg);
 		
 		switch(flag){
-			case option_help:
-				printf("https://github.com/kosshishub/");
+			case flag_help:
+				printf("%s", HELP_MESSAGE);
 				quit();
 				break;
-			case option_version:
+			case flag_version:
 				printf("%s-%i.%i\n",
 					SCUEP_TITLE,
 					SCUEP_VERSION_MAJOR,
@@ -1040,12 +1108,15 @@ int main(int argc, char **argv)
 				);
 				quit();
 				break;
-			case option_nosave:
+			case flag_nosave:
 				nosave = 1;
 				break;
-			case option_stdin:
+			case flag_stdin:
 				playlist = read_stdin();
 				new_playlist = 1;
+				break;
+			case flag_debug:
+				scuep_log_start();
 				break;
 			default:
 				// Assume its a file
@@ -1061,7 +1132,6 @@ int main(int argc, char **argv)
 	}
 
 	if(!playlist) playlist = read_file(playlist_path);
-
 	if(!playlist) quit();
 
 	// Init MPV
@@ -1105,7 +1175,8 @@ int main(int argc, char **argv)
 
 	// Scan files and build DB
 	build_database(playlist);
-	
+	scuep_logf("Database memory usage: %i KB", debug_bytes/1024);
+
 	if( new_playlist ) save_playlist(playlist);
 
 	free(playlist);
@@ -1145,8 +1216,10 @@ int main(int argc, char **argv)
 		// Check if current track ended
 		while(1){
 			mpv_event *event = mpv_wait_event(ctx, 0.0f);
-
 			if(!event->event_id) break;
+
+			scuep_logf("MPV: %s", mpv_event_name(event->event_id) );
+
 			if( event->event_id == MPV_EVENT_IDLE) {
 				if( mpv_state == MPV_INIT )	{
 					mpv_state = MPV_PLAY;
@@ -1155,7 +1228,6 @@ int main(int argc, char **argv)
 					next(1);
 				events++;
 			}
-			//sprintf(debug, "Debug: %s\n", mpv_event_name(event->event_id));
 		}
 
 		// Process remote
@@ -1197,6 +1269,8 @@ int main(int argc, char **argv)
 		mvprintw(0,40+30, "fifo: %s", fifobuf);
 		mvprintw(0,40+40, "c%i w%i (%iKB)", debug_char_blocks, debug_wide_blocks, 
 		debug_bytes / 1024);*/
+
+
 	}
 	quit();
 }

@@ -16,17 +16,15 @@ Features:
 Todo:
 - Add an image here
 - Fix bugs
-- CLEAN UP THE CODE JESUS
-- Volume controls (no keyboard binds atm, use :volume)
 - Test! Test! Test! Especially metadata parsing!
 - Configs
 - Improve looks
 - Improve extensibility
 - Improve and add some basic missing vim/sxiv controls 
 - Improve everything
-- Multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
+- Consider multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
 - Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
-- Tools or controls to allow reordering playlists efficiently
+- Tools or controls to allow reordering and de-duping playlists efficiently
 - Man pages
 
 Goals (and more todo):
@@ -49,6 +47,11 @@ the program must be restarted with a new playlist.
 
 The idea is to let you manage your music library and its organization yourself,
 with existing tools, with as little player specific stuff as possible.
+
+#### CUE sheet notes
+Even though the player is designed for CUEs, usage of alternatives is adviced.
+Many CUE sheets you will find are just plain invalid, if the media is eg just
+regular flac files, use them instead.
 
 ### Starting
 ```
@@ -91,6 +94,8 @@ These are really terrible! Please suggest improvements!
 | z              | Play previous |
 | c              | Toggle play/pause |
 | b              | Play next |
+| +, =           | Volume up |
+| -              | Volume down |
 | m              | Toggle mark selected item |
 | M              | Toggle marks on all items |
 | dM             | Unmark all items |
@@ -119,7 +124,7 @@ when playing. If you deselect all, the player will get really confused.
 
 `:addto <path>` Append selected items to file. Does not check for duplicates.
 
-`:selfile <path>` Select all items that appear in a playlist file
+`:mfile <path>` Select all items that appear in a playlist file
 
 `:!command` Enter a shell command, where % is a path or url of an item.
 The command is run for every single marked item, one by one. If there is no
