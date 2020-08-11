@@ -45,25 +45,26 @@ The player can only play playlists of files, and those playlists cannot be
 modified much at runtime. To load a new playlist, shuffle, or anything else, 
 the program must be restarted with a new playlist. 
 
-The idea is to let you manage your music library and its organization yourself,
-with existing tools, with as little player specific stuff as possible.
+The player does not have a concept of a library. You are given the freedom to
+manage your library yourself, with tools provided or already installed. No
+obscure database formats, only dead-simple playlists.
 
-#### CUE sheet notes
-Even though the player is designed for CUEs, usage of alternatives is adviced.
-Many CUE sheets you will find are just plain invalid, if the media is eg just
-regular flac files, use them instead.
+### Playlists and startup
+The player must be provided a playlist on startup. 
+```
+scuep-media-scanner /path/to/your/music >> ~/new_playlist
 
-### Starting
+scuep ~/new_playlist
 ```
-scuep /path/to/playlist
+Playlists can be piped to the program. 
 ```
-You can also use stdin
+shuf ~/new_playlist | scuep -
 ```
-shuf ~/playlist | scuep -
-```
-If no new playlist is given, player will resume from previous state.
+The provided playlist is saved to `~./config/scuep/playlist`. If no new 
+playlist is provided, the player will attempt to resume from the previous one.
 
-Accepted playlist format is just absolute paths to files with the exception of CUE:
+Playlist format is just list of absolute paths to files with the exception of 
+CUE:
 ```
 /home/bob/Music/somesong.wav
 /home/bob/Music/another song.mp3
@@ -74,29 +75,41 @@ Where CUE URLs are:
 ```
 cue://<path to file>/<track number starting from 1>
 ```
-### Flags
 
+#### CUE sheets
+To scan for CUE sheets, use ``scuep-cue-scanner``.
+
+Note, even though the player is designed for CUEs, usage of alternatives is 
+preferred. Many CUE sheets you will find are just plain invalid, if the media 
+is eg just regular flac files, use them instead.
+
+### Flags
 `--nosave` Don't save state (new playlist or playing track). 
 You should still not run multiple instances of it, all will attempt to listen
 the same fifo file for remote control.
 
 `-`, `-i` Read playlist from stdin
 
+`--debug` Enable logging with syslog, as an alternative to printf debugging ;)
+
+### File marks
+Marking files allows you to perform operations on a subset of the current 
+playlist. See controls and commands below.
 
 ### General controls
-These are really terrible! Please suggest improvements!
+Please suggest improvements!
 
 | Command        | Action |
 | ---            | --- |
 | 0-9            | Repeat following command where reasonable |
 | j, k, Down, Up | Navigate playlist |
-| Enter          | Play highlighted item |
+| Enter          | Play selected item |
 | z              | Play previous |
 | c              | Toggle play/pause |
 | b              | Play next |
 | +, =           | Volume up |
 | -              | Volume down |
-| m              | Toggle mark selected item |
+| m              | Toggle mark on selected item |
 | M              | Toggle marks on all items |
 | dM             | Unmark all items |
 | D              | Disable all marked items |
@@ -124,7 +137,7 @@ when playing. If you deselect all, the player will get really confused.
 
 `:addto <path>` Append selected items to file. Does not check for duplicates.
 
-`:mfile <path>` Select all items that appear in a playlist file
+`:mfile <path>` Mark all items that appear in a playlist
 
 `:!command` Enter a shell command, where % is a path or url of an item.
 The command is run for every single marked item, one by one. If there is no
@@ -160,15 +173,6 @@ Examples:
 `scuep-remote volume -5`
 
 Communication is done with a FIFO in ~/.config/scuep/fifo
-
-### Generating playlists
-```
-scuep-media-scanner /path/to/your/music >> ~/playlist;
-scuep ~/playlist;
-# Or just pipe it
-scuep-cue-scanner /path/to/your/albums | scuep -
-```
-``scuep-cue-scanner`` is used for .cue files.
 
 ### Install
 - Check dependencies
