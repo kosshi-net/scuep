@@ -15,17 +15,14 @@
 #include <stdbool.h>
 #include <poll.h>
 
-
 #include <sys/stat.h>
 #include <sys/time.h>
 
 #include <wordexp.h>
 
 #include "filehelper.h"
-
 #include "util.h"
 #include "log.h"
-
 
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -34,25 +31,6 @@
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 0
 #define SCUEP_VERSION_MINOR 24
-
-
-time_t time_ms(void);
-char *read_file(char*);
-void build_database(char*);
-
-
-// $HOME/.config/scuep/file
-char track_id_path[1024];
-char playlist_path[1024];
-char volume_path  [1024];
-
-bool nosave = 0;
-
-mpv_handle *ctx; 
-enum { 
-	MPV_INIT,
-	MPV_PLAY
-} mpv_state = MPV_INIT;
 
 struct LibraryItem
 {
@@ -72,9 +50,87 @@ struct LibraryItem
 	bool warning;
 };
 
+enum { 
+	MPV_INIT,
+	MPV_PLAY
+} mpv_state = MPV_INIT;
 
-uint32_t row, col;
-uint32_t layout_col_width = 32;
+enum {
+	MODE_DEFAULT,
+	MODE_COMMAND,
+	MODE_SEARCH,
+} input_mode = MODE_DEFAULT;
+
+static time_t time_ms(void);
+static void save_playlist(char*playlist);
+static void save_state(void);
+static int sprinturl( char *dst, struct LibraryItem *item );
+static int fprinturl( FILE *, struct LibraryItem *item );
+
+static void build_database(char*);
+
+static void cleanup(void);
+static void quit(void);
+static void mpverr( int status );
+
+
+static int scuep_match( struct LibraryItem *item, wchar_t *match );
+static void scuep_search(void);
+
+static void shell_item( struct LibraryItem *item );
+static void run_command( const char *cmd );
+
+static void playpause();
+static void play();
+static void seekload( struct LibraryItem *item );
+static void next(int num);
+static void prev(int num);
+static void seek(int seconds);
+static void set_volume(double volume);
+
+static int current_track_progress(void);
+static int current_track_length(void);
+
+static enum Flag parse_flag( char* str );
+
+
+static void queue_redraw(int);
+static void draw_progress(void);
+static void draw_library(void);
+static void draw_texthl( uint32_t, uint32_t, wchar_t*, uint32_t, uint32_t );
+
+static void draw(void);
+
+static int input(void);
+
+/*
+ * To avoid unnecessary redraws, use queue_redraw(ELEMENT_*) when relevant 
+ * state changes happen.
+ * */
+
+#define ELEMENT_ALL      0xFFFF // Redraw all elements
+#define ELEMENT_CLEAR    (1<<0) // Clear all elemenets. Use ELEMENT_ALL to set
+
+#define ELEMENT_PROGRESS (1<<1)
+#define ELEMENT_LIBRARY  (1<<2) // Currently includes everything but progress
+#define ELEMENT_PROMPT   (1<<2) // Does nothing for now
+
+uint32_t elements_dirty = ELEMENT_ALL; // Use via queue_redraw(), not directly
+
+
+#define MAX_CMD_LEN 256
+#define PADX 4
+
+// $HOME/.config/scuep/file
+char track_id_path[1024];
+char playlist_path[1024];
+char volume_path  [1024];
+
+bool nosave = 0;
+
+mpv_handle *ctx; 
+
+uint32_t row, col; 
 
 struct LibraryItem 	*library = NULL;
 uint32_t			 library_items;
@@ -83,35 +139,29 @@ uint32_t			 playing_id  = -1;
 uint32_t			 selected_id = -1;
 bool 			   	 selection_follows = 1;
 
-double output_volume = 100;
-
-enum {
-	MODE_DEFAULT,
-	MODE_COMMAND,
-	MODE_SEARCH,
-} input_mode = MODE_DEFAULT;
-
-#define MAX_CMD_LEN 128
+double output_volume = 100.0f;
 
 char     command      [MAX_CMD_LEN];
 wchar_t  command_wchar[MAX_CMD_LEN];
 uint32_t command_cursor = 0;
 
-uint8_t   input_delete = 0;
+bool     input_delete = 0;
 int32_t  repeat = 0;
 
+wchar_t *library_wide;
+size_t   library_wide_size;
 
-#define PADX 4
+char    *library_char;
+size_t   library_char_size;
+
+char cmd_buf[1024*8];
+
 
 time_t time_ms(){
     struct timeval t;
     gettimeofday(&t, NULL);
     return t.tv_sec*1000+t.tv_usec/1000;
 }
-
-wchar_t *library_wide;
-size_t   library_wide_size;
-
 
 void cleanup(){
 	if(library) {
@@ -120,10 +170,6 @@ void cleanup(){
 	}
 	scuep_log_stop();
 }
-
-char    *library_char;
-size_t   library_char_size;
-
 
 int current_track_progress(){
 	int seconds = 0; 
@@ -138,6 +184,10 @@ int current_track_progress(){
 int current_track_length(){
 	return library[playing_id].length;
 };
+
+void queue_redraw(int elem){
+	elements_dirty |= elem;
+}
 
 
 
@@ -283,7 +333,6 @@ void build_database(char *playlist){
 				library[i].length = taglib_audioproperties_length( tl_prop ) - library[i].start;
 			}
 		}else{ // Misc file, use taglib
-			
 
 			// Copy path
 			library[i].path = library_char+ci;
@@ -344,9 +393,10 @@ void build_database(char *playlist){
 		library_items++;
 	}	
 }
-#define TEXT_ALIGN_RIGHT (1<<0)
 
-void draw_and_search(
+
+#define TEXT_ALIGN_RIGHT (1<<0)
+void draw_texthl(
 	uint32_t x, uint32_t y, 
 	wchar_t*text, 
 	uint32_t width, 
@@ -375,17 +425,20 @@ void draw_and_search(
 	}
 }
 
-void draw_progress(long start, long length){
+
+void draw_progress(){
 
 	char *receive = mpv_get_property_string(ctx, "playback-time");
 
-	int length_seconds = length;
-	int start_seconds = start;
-
-	int mpv_seconds = current_track_progress();
+	int length_seconds = current_track_length();
+	int mpv_seconds =    current_track_progress();
 
 	char *volstr = "Volume:  ..%";
 	int vollen = strlen(volstr);
+
+	move(row-2, 0);
+	clrtoeol();
+
 	mvprintw( row-2, col-PADX-vollen, "%s", volstr );
 
 	mvprintw( row-2, col-PADX-5, "%4i%", (int)output_volume );
@@ -407,21 +460,13 @@ void draw_progress(long start, long length){
 	if(receive) mpv_free(receive);
 }
 
-
 uint8_t blink = 0;
-uint8_t blink_read = 0;
+void draw_library(){
 
-
-// Wasteful! Especially search highlighting is expensive-ish
-// TODO: Only redraw objects that actually need redrawing!
-void draw(){
-	erase();
-
-	getmaxyx(stdscr, row, col);
-
-	draw_progress( library[playing_id].start, library[playing_id].length );
 
 	uint32_t center=MIN( (row/2), selected_id+3);
+
+	int last_redrawn = 0;
 
 	for (int32_t i = selected_id-center; i < (int)library_items; ++i)
 	{
@@ -431,6 +476,9 @@ void draw(){
 		if( y < 3 ) continue;
 		if( y + 4 > (uint32_t)row ) break;
 
+		last_redrawn = y + 1;
+		move(y, 0);
+		clrtoeol();
 
 		if(library[i].marked)
 			mvprintw( y, 2, "%s", "*");
@@ -463,7 +511,7 @@ void draw(){
 		w = curright - x;
 		
 		if(w > 7){
-			draw_and_search( x, y,  library[i].album, w, align );
+			draw_texthl( x, y,  library[i].album, w, align );
 			align = 0;
 			curright -= w;
 		}
@@ -472,7 +520,7 @@ void draw(){
 		w = curright - x;
 
 		if(w > 7){
-			draw_and_search( x,	y,  library[i].performer, 	w,   align );
+			draw_texthl( x,	y,  library[i].performer, 	w,   align );
 			curright -= w;
 		}
 
@@ -480,10 +528,18 @@ void draw(){
 
 		x = curleft;
 		w = curright - x;
-		draw_and_search( x, y,  library[i].track,     	w,   align );
+		draw_texthl( x, y,  library[i].track,     	w,   align );
 
 		attroff(COLOR_PAIR(1));
 	}
+	
+	while( last_redrawn+3 <= row ){
+		move(last_redrawn++, 0);
+		clrtoeol();
+	}
+
+	move(1, 0);
+	clrtoeol();
 
 	mvprintw( 1, PADX, "Playlist %i/%i ", selected_id, library_items );
 	blink = !blink;
@@ -492,9 +548,28 @@ void draw(){
 		SCUEP_VERSION_MINOR
 	);
 	if(blink) 		mvprintw( 1l, col-PADX, "*" );
-	if(blink_read)  mvprintw( 1l, col-PADX+1, "*" );
-	mvprintw( row-1, 0, "%S", command_wchar );
+
+	move(row-1, 0);
+	clrtoeol();
+	printw("%S", command_wchar );
 	refresh();
+}
+
+void draw(){
+
+	// Poll term size and detect resize events
+	int nrow, ncol;
+	getmaxyx(stdscr, nrow, ncol);
+	if( nrow != row || ncol != col) queue_redraw(ELEMENT_ALL);
+	col = ncol;
+	row = nrow;
+
+	if( elements_dirty & ELEMENT_CLEAR ) clear();
+
+	if( elements_dirty & ELEMENT_PROGRESS ) draw_progress();
+	if( elements_dirty & ELEMENT_LIBRARY  ) draw_library();
+	
+	elements_dirty = 0;
 }
 
 int scuep_match( struct LibraryItem *item, wchar_t *match ){
@@ -504,7 +579,6 @@ int scuep_match( struct LibraryItem *item, wchar_t *match ){
 		scuep_wcscasestr( item->album,     match) 
 	);
 }
-
 
 void scuep_search(){
 	for (uint32_t i = 0; i < library_items; ++i) {
@@ -578,8 +652,6 @@ int fprinturl( FILE*fp, struct LibraryItem *item){
 }
 
 
-char cmd_buf[1024*8];
-
 void  shell_item( struct LibraryItem *item ){
 	char *src = command+2;
 	char *dst = cmd_buf;
@@ -595,7 +667,6 @@ void  shell_item( struct LibraryItem *item ){
 
 	system(cmd_buf);
 }
-void next(int);
 
 
 void playpause(){
@@ -627,6 +698,8 @@ void seekload( struct LibraryItem *item ){
 	free(mpv_cmd[3]);
 	save_state();
 	play();
+
+	queue_redraw(ELEMENT_PROGRESS | ELEMENT_LIBRARY);
 	return;
 }
 
@@ -645,6 +718,8 @@ void seek(int seconds){
 	sprintf( mpv_cmd[1], "%i", seconds );
 	mpverr( mpv_command(ctx, (const char**)mpv_cmd) ); 
 	free(mpv_cmd[1]);
+
+	queue_redraw(ELEMENT_PROGRESS);
 }
 
 void next(int num){
@@ -662,16 +737,17 @@ void prev(int num){
 void set_volume(double volume){
 	double dvol = volume;
 	mpverr(mpv_set_property(ctx, "volume", MPV_FORMAT_DOUBLE, &dvol));
+	queue_redraw(ELEMENT_PROGRESS);
 };
 
 void run_command( const char *cmd  ){
 
 	scuep_logf( "Command: %s", cmd );
 
-	if( prefix("next" ,cmd)) next(1);
-	if( prefix("prev" ,cmd)) prev(1);
-	if( prefix("play" ,cmd)) playpause();
-	if( prefix("pause",cmd)) playpause();
+	if( prefix("next" ,cmd)) {next(1);     goto command_clear;}
+	if( prefix("prev" ,cmd)) {prev(1);     goto command_clear;}
+	if( prefix("play" ,cmd)) {playpause(); goto command_clear;}
+	if( prefix("pause",cmd)) {playpause(); goto command_clear;}
 
 	if(cmd[0] == 'q')
 		quit();
@@ -684,6 +760,7 @@ void run_command( const char *cmd  ){
 			shell_item(library+i);
 		}
 		if(!num_marked) shell_item( library+selected_id );
+		goto command_clear;
 	}
 
 	if( prefix("m/", cmd)){
@@ -692,6 +769,7 @@ void run_command( const char *cmd  ){
 				library[i].marked = 1;
 			}
 		}
+		goto command_clear;
 	}
 
 	// TODO Option to block addto when running from a fifo 
@@ -739,8 +817,8 @@ void run_command( const char *cmd  ){
 
 		wordfree(&p);
 		fclose(fp);
-
-		return;
+		
+		goto command_clear;
 	}
 
 	if( prefix("mfile", cmd) ){
@@ -785,7 +863,7 @@ void run_command( const char *cmd  ){
 		}
 
 		free(mfile);
-
+		goto command_clear;
 	}
 
 	if( prefix("volume", cmd) 
@@ -814,8 +892,14 @@ void run_command( const char *cmd  ){
 
 		set_volume(output_volume);
 		save_state();
+		goto command_clear;
 	}
 
+	sprintf( command, "%s", "No such command" );
+	mbstowcs(command_wchar, command, 128 );
+	return;
+
+	command_clear:
 	command_cursor = 0;
 	command[command_cursor] = 0;
 }
@@ -836,17 +920,17 @@ int input(void){
 		
 		debug_last_key = key;
 		
-		if( input_mode == MODE_DEFAULT ) 			goto SWITCH_MODE_DEFAULT;
-		if( input_mode == MODE_COMMAND )	 		goto SWITCH_MODE_COMMAND;
-		if( input_mode == MODE_SEARCH ) 			goto SWITCH_MODE_SEARCH;
+		if( input_mode == MODE_DEFAULT ) goto SWITCH_MODE_DEFAULT;
+		if( input_mode == MODE_COMMAND ) goto SWITCH_MODE_COMMAND;
+		if( input_mode == MODE_SEARCH )  goto SWITCH_MODE_SEARCH;
 
-	SWITCH_MODE_SEARCH:
+		SWITCH_MODE_SEARCH:
 		input_mode = MODE_DEFAULT;
 		goto SWITCH_MODE_DEFAULT;
 		goto END;
 
 
-	SWITCH_MODE_COMMAND:
+		SWITCH_MODE_COMMAND:
 		switch(key){
 			case 27: // Escape
 				command_cursor = 0;
@@ -878,13 +962,16 @@ int input(void){
 				command[command_cursor] = 0;
 				break;
 		}
+		queue_redraw(ELEMENT_LIBRARY);
 		mbstowcs(command_wchar, command, 128 );
 		goto END;
 
 
-	SWITCH_MODE_DEFAULT:
+		SWITCH_MODE_DEFAULT:
 		switch(key){
 			case 27: // Escape
+
+				queue_redraw(ELEMENT_LIBRARY);
 
 				if( command[0] == '/' ){				
 					command_cursor = 0;
@@ -919,12 +1006,15 @@ int input(void){
 				set_volume( output_volume );
 				repeat = 0;
 				break;
+
 			case '1': case '2': case '3': 
 			case '4': case '5': case '6': 
 			case '7': case '8': case '9':
 			case '0': 
 				repeat = repeat*10 + (key-'0');
 				break;
+
+
 			case 'k':
 			case KEY_UP:
 				selected_id -= MAX( 1, repeat );
@@ -936,21 +1026,26 @@ int input(void){
 				selected_id = (library_items + selected_id) % library_items;
 				selection_follows = 0;
 				repeat = 0;
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
+
 			case 'm':
 				library[selected_id].marked = !library[selected_id].marked;
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
 			case 'M':
 				for( int i = 0; i < library_items; i++  ){
 					library[i].marked = !library[i].marked;
 					if(input_delete) library[i].marked = 0;
 				}
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
 			case 'g':
 				selected_id = repeat;
 				selected_id = (library_items + selected_id) % library_items;
 				selection_follows = 0;
 				repeat = 0;
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
 
 
@@ -984,10 +1079,12 @@ int input(void){
 				}
 				if(!num_marked) 
 					library[selected_id].disabled = !library[selected_id].disabled;
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
 
 			case 'l':
 				clear();
+				queue_redraw(ELEMENT_ALL);
 				break;
 
 			case 'N':
@@ -1004,6 +1101,7 @@ int input(void){
 					
 					selected_id = j;
 					selection_follows = 0;
+					queue_redraw(ELEMENT_LIBRARY);
 					break;
 					
 				}
@@ -1016,13 +1114,14 @@ int input(void){
 				command[command_cursor++] = key;
 				command[command_cursor] = 0;
 				mbstowcs(command_wchar, command, 128 );
+				queue_redraw(ELEMENT_LIBRARY);
 				break;
 			default:
 				break;
 		}
 		goto END;
 
-	END:
+		END:
 		timeout(0);
 
 		if(key != 'd')
@@ -1209,9 +1308,11 @@ int main(int argc, char **argv)
 	// volume in seekload doesnt work on all machines?
 	set_volume(output_volume);
 
+	clear();
+
 	// Main loop
 	while(1){
-		int events = 0;
+		int events = 0; // Unused for now, was used to control redraws
 
 		// Check if current track ended
 		while(1){
@@ -1227,6 +1328,8 @@ int main(int argc, char **argv)
 				} else
 					next(1);
 				events++;
+				queue_redraw(ELEMENT_LIBRARY);
+				queue_redraw(ELEMENT_PROGRESS);
 			}
 		}
 
@@ -1254,24 +1357,19 @@ int main(int argc, char **argv)
 		// Process input, also sleeps 100ms
 		events += input();
 		
-		int now = time_ms();
-		if( now > last_draw + 1000 ) events++;
-		
-		// Dont draw if no events
-		if( events == 0 ) continue;
-		last_draw = now;
+		time_t now = time_ms();
+		if( now > last_draw + 1000 ){
+			last_draw = now;
+			queue_redraw(ELEMENT_PROGRESS);
+		}
 		
 		if(selection_follows)
 			selected_id = playing_id;
 
 		draw();
-		/*mvprintw(0, 40, debug);
-		mvprintw(0,40+30, "fifo: %s", fifobuf);
-		mvprintw(0,40+40, "c%i w%i (%iKB)", debug_char_blocks, debug_wide_blocks, 
-		debug_bytes / 1024);*/
-
 
 	}
+
 	quit();
 }
 

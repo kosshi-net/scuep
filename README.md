@@ -50,7 +50,7 @@ manage your library yourself, with tools provided or already installed. No
 obscure database formats, only dead-simple playlists.
 
 ### Playlists and startup
-The player must be provided a playlist on startup. 
+The player must be provided a playlist on first startup. 
 ```
 scuep-media-scanner /path/to/your/music >> ~/new_playlist
 
@@ -60,7 +60,7 @@ Playlists can be piped to the program.
 ```
 shuf ~/new_playlist | scuep -
 ```
-The provided playlist is saved to `~./config/scuep/playlist`. If no new 
+The provided playlist is saved to `~/.config/scuep/playlist`. If no new 
 playlist is provided, the player will attempt to resume from the previous one.
 
 Playlist format is just list of absolute paths to files with the exception of 
@@ -182,6 +182,9 @@ Communication is done with a FIFO in ~/.config/scuep/fifo
 
 ### Uninstall
 - ``sudo make uninstall``
+
+Use the same Makefile you used to install. There's been very little testing of 
+distribution and Makefile itself may change.
 
 ## Dependencies
 - ncursesw
