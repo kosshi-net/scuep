@@ -30,7 +30,8 @@
 
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 0
-#define SCUEP_VERSION_MINOR 24
+#define SCUEP_VERSION_MINOR 25
+
 
 struct LibraryItem
 {
@@ -50,6 +51,7 @@ struct LibraryItem
 	bool warning;
 };
 
+
 enum { 
 	MPV_INIT,
 	MPV_PLAY
@@ -67,7 +69,7 @@ static void save_state(void);
 static int sprinturl( char *dst, struct LibraryItem *item );
 static int fprinturl( FILE *, struct LibraryItem *item );
 
-static void build_database(char*);
+static void build_library(char*);
 
 static void cleanup(void);
 static void quit(void);
@@ -94,6 +96,12 @@ static int current_track_length(void);
 static enum Flag parse_flag( char* str );
 
 
+static void load_marks( char *file );
+static int  save_marks( char *path );
+
+
+
+
 static void queue_redraw(int);
 static void draw_progress(void);
 static void draw_library(void);
@@ -108,12 +116,15 @@ static int input(void);
  * state changes happen.
  * */
 
-#define ELEMENT_ALL      0xFFFF // Redraw all elements
 #define ELEMENT_CLEAR    (1<<0) // Clear all elemenets. Use ELEMENT_ALL to set
 
 #define ELEMENT_PROGRESS (1<<1)
 #define ELEMENT_LIBRARY  (1<<2) // Currently includes everything but progress
 #define ELEMENT_PROMPT   (1<<2) // Does nothing for now
+
+#define ELEMENT_PROPERTIES (1<<4) 
+
+#define ELEMENT_ALL      (0xFFFF-ELEMENT_PROPERTIES) // Redraw all elements
 
 uint32_t elements_dirty = ELEMENT_ALL; // Use via queue_redraw(), not directly
 
@@ -121,10 +132,16 @@ uint32_t elements_dirty = ELEMENT_ALL; // Use via queue_redraw(), not directly
 #define MAX_CMD_LEN 256
 #define PADX 4
 
+// These paths are used to keep state over restarts
 // $HOME/.config/scuep/file
-char track_id_path[1024];
-char playlist_path[1024];
-char volume_path  [1024];
+char track_id_path[1024]; 
+char playlist_path[1024]; 
+char volume_path  [1024];  
+char mark_path    [1024]; 
+
+#define  MARKS_DIRTY 4
+uint32_t mark_write_timeout = MARKS_DIRTY;
+
 
 bool nosave = 0;
 
@@ -196,10 +213,11 @@ int debug_char_blocks = 0;
 size_t debug_bytes = 0;
 #define MAX_STR_LEN 512
 #define BLOCK_SIZE 1024*4 
-void build_database(char *playlist){
-
-	// wchar_t is used for anything that will be rendered
-	// char for things like filepaths
+void build_library(char *playlist){
+	/* 
+	 * wchar_t library_wide is used for anything that will be rendered.
+	 * char    library_char for things like filepaths.
+	 */
 
 	library_wide_size = BLOCK_SIZE;
 	library_char_size = BLOCK_SIZE;
@@ -214,6 +232,7 @@ void build_database(char *playlist){
 	do{ if(*c=='\n') track_count++; } while(*++c);
 	library = calloc( track_count, sizeof(struct LibraryItem) );
 
+	// Indices for library_wide and library_char
 	uint32_t wi=0;
 	uint32_t ci=0;
 
@@ -223,7 +242,7 @@ void build_database(char *playlist){
 	c = playlist;
 
 	for (int i = 0; ; ++i) {
-		// Read in line from playlist
+		// Load a line from the playlist to variable url
 		_line_buf = line_buf;
 		while( *c != '\n'){
 			if( *c == '\0' ) return; // End of file
@@ -231,11 +250,13 @@ void build_database(char *playlist){
 		}
 		*_line_buf = '\0'; 
 		c++;
-
 		char *url = line_buf;
 
-		// TODO: Launch option to disable this, in case this slows down loading
+		// Print progress
+		// Was able to load 3000 files in 2 seconds, this is not a 
+		// bottleneck. 
 		if( 1 ){
+			
 			erase();
 			char *str = "Parsing metadata ...";
 
@@ -249,8 +270,8 @@ void build_database(char *playlist){
 		}
 
 		// Make sure we have enough memory
-		// If not, alloc a new block
-		// Previous one is "leaked" currently !!
+		// If not, alloc a new block, previous one is "leaked" currently !!
+		
 		if( ci + MAX_STR_LEN * 1 >= library_char_size ){
 			library_char = malloc( library_char_size * sizeof(char) );
 			ci = 0;
@@ -273,7 +294,7 @@ void build_database(char *playlist){
 
 		if( strncmp(&url[0], "cue://", 6)  == 0  ) {
 			// CUE sheet, use libcue
-			// Parse chapter
+			// Parse chapter number
 			char *chap = url + strlen(url);
 			while(*--chap != '/');
 			*chap++ = '\0';
@@ -298,12 +319,11 @@ void build_database(char *playlist){
 
 			library[i].chapter 	 = chapter;
 
-			char  *string = scuep_read_file(library[i].path);
+			char *string = scuep_read_file( library[i].path );
 			if(string == NULL) {
 				endwin();
 				printf("Error: Missing file (item %i)\n", i);
-				printf("Path: %s\n", library[i].path);
-
+				printf("Path: %s\n", library[i].path );
 				cleanup();
 				exit(1);
 			}
@@ -348,7 +368,6 @@ void build_database(char *playlist){
 				endwin();
 				printf("Error: Missing file (item %i)\n", i);
 				printf("Path: %s\n", library[i].path);
-
 				cleanup();
 				exit(1);
 			}
@@ -368,6 +387,7 @@ void build_database(char *playlist){
 		if(!utf8_title)  utf8_title = "";
 		if(!utf8_artist) utf8_artist = "";
 
+		// if metadata failed to load, use filename instead
 		if( !utf8_title[0] )  utf8_title = scuep_basename(url);
 
 		library[i].album = library_wide+wi;
@@ -458,6 +478,39 @@ void draw_progress(){
 		length_seconds%60
 	);
 	if(receive) mpv_free(receive);
+}
+
+
+void draw_properties(){
+	for( int y = 3; y+3 < row; y++ ){
+		
+		move(y, 0);
+		clrtoeol();
+
+	}
+	int y = 3;
+	mvprintw( y++, 4, "Item %i properties:", selected_id);
+
+	struct LibraryItem *item = library+selected_id;
+
+	mvprintw( y++, 4, "Track:     %S", item->track);
+	mvprintw( y++, 4, "Performer: %S", item->performer);
+	mvprintw( y++, 4, "Album:     %S", item->album);
+	mvprintw( y++, 4, "Chapter:   %i", item->chapter);
+
+	mvprintw( y++, 4, "Start:     %i (%i:%02i)", 
+		item->start,  item->start/60, item->start%60 );
+	mvprintw( y++, 4, "Length:    %i (%i:%02i)",
+		item->length,  item->length/60, item->length%60 );
+	mvprintw( y++, 4, "Path:      %s", item->path); // Let the filepath wrap
+
+	y+=5;
+
+	mvprintw( y++, 4, "scuep properties:");
+	mvprintw( y++, 4, "DB heap: %f MB", debug_bytes / 1024.0 / 1024.0 );
+	mvprintw( y++, 4, "Wide blocks: %i", debug_wide_blocks+1 );
+	mvprintw( y++, 4, "Char blocks: %i", debug_char_blocks+1 );
+
 }
 
 uint8_t blink = 0;
@@ -568,6 +621,8 @@ void draw(){
 
 	if( elements_dirty & ELEMENT_PROGRESS ) draw_progress();
 	if( elements_dirty & ELEMENT_LIBRARY  ) draw_library();
+
+	if( elements_dirty & ELEMENT_PROPERTIES  ) draw_properties();
 	
 	elements_dirty = 0;
 }
@@ -617,6 +672,7 @@ void save_state(){
 }
 
 void quit(){
+	save_marks( mark_path );
 	endwin();
 	cleanup();
 	exit(0);
@@ -740,6 +796,51 @@ void set_volume(double volume){
 	queue_redraw(ELEMENT_PROGRESS);
 };
 
+
+
+
+void load_marks( char *mfile ){
+
+	char *s = mfile;
+	
+	// Replace all newlines with null
+	for( s=mfile-1; *++s; *s*=(*s!='\n') );
+
+	char urlbuf[1024*8];
+	for( int i = 0; i < library_items; i++ ){
+		sprinturl(urlbuf, library+i);
+		s = mfile;
+		while(1){
+			int l = strlen(s);
+			if(l==0) break;  
+			if(strcmp(urlbuf, s)==0) library[i].marked = 1;
+			s+=l+1;
+		}
+	}
+
+
+}
+int save_marks( char *path ){
+	
+	if(nosave) return 0;
+
+	FILE *fp = fopen( path, "w");
+
+	if(!fp) return 1;
+
+	for( int i = 0; i < library_items; i++ ){
+		if(!library[i].marked) continue;
+		fprinturl(fp, library+i );
+	}
+
+	fclose(fp);
+	scuep_logf("%s", "Saved marks");
+	return 0;
+}
+
+
+
+
 void run_command( const char *cmd  ){
 
 	scuep_logf( "Command: %s", cmd );
@@ -773,7 +874,10 @@ void run_command( const char *cmd  ){
 	}
 
 	// TODO Option to block addto when running from a fifo 
-	if( prefix("addto", cmd) ){
+	// TODO Notify the user when a new file was created
+	if( prefix("addto",  cmd)
+	 || prefix("append", cmd) 
+	 || prefix("a",      cmd) ){
 
 		wordexp_t p;
 		int err = wordexp( cmd+strlen("addto "), &p, 0 );
@@ -817,8 +921,8 @@ void run_command( const char *cmd  ){
 
 		wordfree(&p);
 		fclose(fp);
-		
-		goto command_clear;
+
+		return;
 	}
 
 	if( prefix("mfile", cmd) ){
@@ -845,24 +949,10 @@ void run_command( const char *cmd  ){
 			return;
 		}
 
-		char *s = mfile;
-		
-		// Replace all newlines with null
-		for( s=mfile-1; *++s; *s*=(*s!='\n') );
-
-		char urlbuf[1024*8];
-		for( int i = 0; i < library_items; i++ ){
-			sprinturl(urlbuf, library+i);
-			s = mfile;
-			while(1){
-				int l = strlen(s);
-				if(l==0) break;  
-				if(strcmp(urlbuf, s)==0) library[i].marked = 1;
-				s+=l+1;
-			}
-		}
+		load_marks(mfile);
 
 		free(mfile);
+
 		goto command_clear;
 	}
 
@@ -1032,6 +1122,8 @@ int input(void){
 			case 'm':
 				library[selected_id].marked = !library[selected_id].marked;
 				queue_redraw(ELEMENT_LIBRARY);
+				
+				mark_write_timeout = MARKS_DIRTY;
 				break;
 			case 'M':
 				for( int i = 0; i < library_items; i++  ){
@@ -1039,6 +1131,8 @@ int input(void){
 					if(input_delete) library[i].marked = 0;
 				}
 				queue_redraw(ELEMENT_LIBRARY);
+
+				mark_write_timeout = MARKS_DIRTY;
 				break;
 			case 'g':
 				selected_id = repeat;
@@ -1116,6 +1210,13 @@ int input(void){
 				mbstowcs(command_wchar, command, 128 );
 				queue_redraw(ELEMENT_LIBRARY);
 				break;
+
+			case 'p':
+				queue_redraw(ELEMENT_PROPERTIES);
+
+				break;
+
+
 			default:
 				break;
 		}
@@ -1186,6 +1287,7 @@ int main(int argc, char **argv)
 	snprintf( track_id_path, 1024, "%s/.config/scuep/track_id", home);
 	snprintf( playlist_path, 1024, "%s/.config/scuep/playlist", home);
 	snprintf( volume_path,   1024, "%s/.config/scuep/volume"  , home);
+	snprintf( mark_path,     1024, "%s/.config/scuep/marks"   , home);
 
 	char *playlist = NULL;
 	int new_playlist = 0;
@@ -1273,7 +1375,7 @@ int main(int argc, char **argv)
 	init_pair(4, COLOR_RED, -1);
 
 	// Scan files and build DB
-	build_database(playlist);
+	build_library(playlist);
 	scuep_logf("Database memory usage: %i KB", debug_bytes/1024);
 
 	if( new_playlist ) save_playlist(playlist);
@@ -1285,13 +1387,22 @@ int main(int argc, char **argv)
 		char *_track_id = read_file(track_id_path);
 		playing_id = atoi(_track_id);
 		free(_track_id);
-	} 
+
+		char *mfile = read_file( mark_path );
+		if(mfile) {
+			load_marks( mfile );
+			free(mfile);
+		}
+	}
+	
 	
 	char *_vol = read_file( volume_path );
 	if(_vol){
 		output_volume = *(double*)_vol;
 		free(_vol);
 	}
+
+
 
 	fd = open(fifopath, O_RDONLY | O_NONBLOCK);
 	struct pollfd fds[1];
@@ -1303,7 +1414,7 @@ int main(int argc, char **argv)
 	// Clear FIFO in case of offline writes
 	while(read(fd, fifobuf, 128) );
 
-	time_t last_draw = time_ms();
+	time_t ticker_sec = time_ms();
 
 	// volume in seekload doesnt work on all machines?
 	set_volume(output_volume);
@@ -1357,10 +1468,23 @@ int main(int argc, char **argv)
 		// Process input, also sleeps 100ms
 		events += input();
 		
+		// Execute once a second
 		time_t now = time_ms();
-		if( now > last_draw + 1000 ){
-			last_draw = now;
+		if( now > ticker_sec + 1000 ){
+			ticker_sec = now;
+
 			queue_redraw(ELEMENT_PROGRESS);
+
+			if( mark_write_timeout > 0 ){
+				mark_write_timeout--;
+
+				if( !mark_write_timeout ){
+
+					save_marks( mark_path );
+
+				}
+			}
+
 		}
 		
 		if(selection_follows)

@@ -13,32 +13,50 @@ Features:
 - sxiv style file marking
 - vim style controls and search
 
+Todo until first release:
+- Image here!
+- Deduplication tools
+- Sane way to reorder playlists
+
 Todo:
-- Add an image here
-- Fix bugs
-- Test! Test! Test! Especially metadata parsing!
-- Configs
-- Improve looks
-- Improve extensibility
-- Improve and add some basic missing vim/sxiv controls 
-- Improve everything
-- Consider multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
-- Metadata caching (Loading metadata of 3188 mp3 files from a 7200rpm consumer hard drive took 55 seconds after a cold boot)
-- Tools or controls to allow reordering and de-duping playlists efficiently
 - Man pages
+- Improve extensibility (eg a program to query metadata of current playing track)
+- Improve and add some basic missing vim/sxiv controls 
+- Improve looks
+- Improve everything
+
+Features in consideration:
+- Metadata caching? Only useful with massive playlists (several thousand items) and slow drives
+- Consider multimedia key integration for some desktop enviroments (you have to bind scuep-remote yourself currently)
+- Key rebinding
+- Support for other *nix systems
+- Switch to a more minimal backend. 
+
+Feel free to open up a issue for feature requests, even if its already listed 
+here. 
 
 Goals (and more todo):
 - A player that can read metadata and play most filetypes, and not much else
 - Simple but powerful controls to allow you to sort your music efficiently 
-- Simple shell-friendly APIs to allow you to implement missing features yourself
+- Simple shell-friendly APIs to allow you to make the player do wahtever you wish 
+
+### Performance
+Scuep can load massive playlists, largest tested is 60 000 tracks. 55 
+megabyte memory usage and player remained perfectly responsive. Loading such
+massive playlists however can take a while, and there is no caching mechanisms 
+in place currently.
 
 # Another music player? Why?
-This player was originally made pretty much to play CUE+TTA only because CMUS
+This player was originally made pretty much to play only CUE+TTA because CMUS
 CUE support 
 [seems to be broken for Gentoo](https://github.com/cmus/cmus/issues/886).
 I didn't exactly like how CMUS behaved in the first place, and didn't feel 
 like hunting for a minimal but powerful player that still supports the obscure 
-formats I need.
+formats I need. 
+
+If you already use MPV or other generic media player for playing your music, 
+this  player is for you. It's not much more than a fancy MPV frontend and a 
+playlist manager.
 
 ## Usage
 The player can only play playlists of files, and those playlists cannot be
@@ -61,7 +79,7 @@ Playlists can be piped to the program.
 shuf ~/new_playlist | scuep -
 ```
 The provided playlist is saved to `~/.config/scuep/playlist`. If no new 
-playlist is provided, the player will attempt to resume from the previous one.
+playlist is provided, the player will resume from previous state. 
 
 Playlist format is just list of absolute paths to files with the exception of 
 CUE:
@@ -84,7 +102,7 @@ preferred. Many CUE sheets you will find are just plain invalid, if the media
 is eg just regular flac files, use them instead.
 
 ### Flags
-`--nosave` Don't save state (new playlist or playing track). 
+`--nosave` Don't save state (new playlist, playing track, marked itmes ..). 
 You should still not run multiple instances of it, all will attempt to listen
 the same fifo file for remote control.
 
@@ -94,7 +112,10 @@ the same fifo file for remote control.
 
 ### File marks
 Marking files allows you to perform operations on a subset of the current 
-playlist. See controls and commands below.
+playlist. See controls and commands below. 
+
+Marks are saved to `~./config/scuep/marks` to allow the player to remember 
+them over restarts.
 
 ### General controls
 Please suggest improvements!
@@ -119,6 +140,7 @@ Please suggest improvements!
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | l              | Clear out the display, fixes corruption |
+| p              | Display properties |
 
 * Either an item matching search, if no search active, find a marked item
 
@@ -135,7 +157,7 @@ when playing. If you deselect all, the player will get really confused.
 `:volume <integer>` Set volume in range 0 - 100. Number can be prefixed with 
 `+` or `-` for relative control. 
 
-`:addto <path>` Append selected items to file. Does not check for duplicates.
+`:append <path>` Aliases: `a, addto` Append selected items to file. Does not check for duplicates. 
 
 `:mfile <path>` Mark all items that appear in a playlist
 

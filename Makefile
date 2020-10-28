@@ -5,6 +5,8 @@ TAGLIB=		`pkg-config --libs --cflags taglib_c`
 
 CLFAGS = -Wall 
 
+BIN=scuep
+
 src = scuep.c util.c log.c
 obj = $(src:.c=.o)
 
@@ -14,10 +16,10 @@ CC = cc
 all: bin/scuep  bin/scuep-cue-to-urls
 
 bin/scuep-cue-to-urls: scuep-cue-to-urls.c filehelper.h;
-	${CC} scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
+	$(CC) scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
 
 bin/scuep: $(obj);
-	${CC} $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o $@
+	$(CC) $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o $@
 
 .PHONY: clean install uninstall
 clean:
@@ -31,6 +33,7 @@ install: all
 		"bin/scuep-remote" \
 		"bin/scuep-cue-scanner" \
 		"bin/scuep-media-scanner" \
+		"bin/scuep-dedup" \
 		"bin/scuep-cue-to-urls" \
 		$(DESTDIR)$(PREFIX)/bin 
 	chmod 755 \
@@ -38,6 +41,7 @@ install: all
 		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep"
 
 
@@ -48,5 +52,6 @@ uninstall:
 		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep"
 
