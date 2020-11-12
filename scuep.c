@@ -30,7 +30,7 @@
 
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 0
-#define SCUEP_VERSION_MINOR 25
+#define SCUEP_VERSION_MINOR 26
 
 
 struct LibraryItem
@@ -845,6 +845,11 @@ void run_command( const char *cmd  ){
 
 	scuep_logf( "Command: %s", cmd );
 
+
+	const char *arg = cmd;
+	while( *arg && *arg!=' ' ) arg++;
+
+
 	if( prefix("next" ,cmd)) {next(1);     goto command_clear;}
 	if( prefix("prev" ,cmd)) {prev(1);     goto command_clear;}
 	if( prefix("play" ,cmd)) {playpause(); goto command_clear;}
@@ -875,12 +880,15 @@ void run_command( const char *cmd  ){
 
 	// TODO Option to block addto when running from a fifo 
 	// TODO Notify the user when a new file was created
-	if( prefix("addto",  cmd)
-	 || prefix("append", cmd) 
-	 || prefix("a",      cmd) ){
+	
+	
+	if( prefix("addto ",  cmd)
+	 || prefix("append ", cmd) 
+	 || prefix("a ",      cmd) ){
+		
 
 		wordexp_t p;
-		int err = wordexp( cmd+strlen("addto "), &p, 0 );
+		int err = wordexp( arg, &p, 0 );
 		if( err ){
 			sprintf( command, "Error parsing path (wordexpr error %i)", err  );
 			mbstowcs(command_wchar, command, 128 );
@@ -925,10 +933,10 @@ void run_command( const char *cmd  ){
 		return;
 	}
 
-	if( prefix("mfile", cmd) ){
+	if( prefix("mfile ", cmd) ){
 
 		wordexp_t p;
-		int err = wordexp( cmd+strlen("mfile "), &p, 0 );
+		int err = wordexp( arg, &p, 0 );
 		if( err ){
 			sprintf( command, "Error parsing path (wordexpr error %i)", err  );
 			mbstowcs(command_wchar, command, 128 );
