@@ -2,28 +2,34 @@ NCURSES=	`pkg-config --libs --cflags ncursesw`
 LIBCUE=		`pkg-config --libs --cflags libcue`
 MPV=		`pkg-config --libs --cflags mpv`
 TAGLIB=		`pkg-config --libs --cflags taglib_c`
+SQLITE=		`pkg-config --libs --cflags sqlite3`
 
 CLFAGS = -Wall 
 
 BIN=scuep
 
-src = scuep.c util.c log.c
+src = src/scuep.c src/database.c src/util.c src/log.c
 obj = $(src:.c=.o)
+sql = sql/reset.sql
+sql_h = src/sql.h
 
 PREFIX = /usr/local
 CC = cc
 
 all: bin/scuep  bin/scuep-cue-to-urls
 
-bin/scuep-cue-to-urls: scuep-cue-to-urls.c filehelper.h;
-	$(CC) scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
+$(sql_h): $(sql)
+	xxd -i $^ > $@;
 
-bin/scuep: $(obj);
-	$(CC) $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) -lpthread -g -o $@
+bin/scuep-cue-to-urls: src/scuep-cue-to-urls.c src/filehelper.h;
+	$(CC) src/scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
+
+bin/scuep: $(sql_h) $(obj)
+	$(CC) $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) $(SQLITE) -g -o $@
 
 .PHONY: clean install uninstall
 clean:
-	rm $(obj) bin/scuep-cue-to-urls bin/scuep
+	rm $(obj) $(sql_h) bin/scuep-cue-to-urls bin/scuep
 
 
 install: all
