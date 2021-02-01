@@ -22,6 +22,7 @@
 #include "util.h"
 #include "log.h"
 
+#include "track.h"
 #include "database.h"
 
 #define SCUEP_TITLE "scuep"
@@ -154,31 +155,18 @@ int main(int argc, char **argv)
 	}
 
 	
-	if (database_init( path_database )) {
+	if (db_init( path_database )) {
 		fprintf(stderr, "Database error\n");
+		return 1;
 	}else{
 		printf("Database OK\n");
 	}
 
-	
+	playlist_clear();
 	load_playlist( input_file );
 
 
 }
-
-
-struct ScuepTrackUTF8 {
-	const char *album;
-	const char *artist;
-	const char *title;
-	const char *path;
-
-	int32_t start;
-	int32_t length;
-	int32_t chapter;
-	int32_t mask;
-};
-
 
 #define CD_FRAMERATE 75
 
@@ -189,28 +177,31 @@ struct ScuepTrackUTF8 {
 
 void load_playlist(char *playlist)
 {
-	int track_count = 1;
-	char *c = playlist; 
-	do{ if(*c=='\n') track_count++; } while(*++c);
-
-	char line_buf[4096];
+	//int track_count = 1;
+	//do{ if(*c=='\n') track_count++; } while(*++c);
+	
+	char clip[4096];
 	char path[MAX_PATH_LEN];
-	char *_line_buf;
 
-	c = playlist;
-
-
+	char 		*head = playlist;
+	const char  *tail = playlist;
 
 	for (int i = 0; ; ++i) {
-		// Load a line from the playlist to variable url
-		_line_buf = line_buf;
-		while( *c != '\n'){
-			if( *c == '\0' ) return; // End of file
-			*_line_buf++ = *c++;
-		}
-		*_line_buf = '\0'; 
-		c++;
-		char *url = line_buf;
+		int track_id = -1;
+		while( *head && *head != '\n' ) head++;
+		if(*head=='\0') return; // END OF LINE
+		*head = '\0';
+		
+		strcpy(clip, tail);
+		const char *url = tail;
+
+		// Check if URL exists in cache database
+		// if true, add id and continue
+		/*track_id = track_id_by_url(url);
+		if( track_id > -1){
+			playlist_push(track_id);
+			continue;
+		}*/
 
 		Cd          *cue_cd  = NULL;
 		TagLib_File *tl_file = NULL;
@@ -218,11 +209,12 @@ void load_playlist(char *playlist)
 		struct ScuepTrackUTF8 track;
 		memset(&track, 0, sizeof(struct ScuepTrackUTF8));
 		track.path = path;
+		track.url  = url;
 
 		if (strncmp(&url[0], "cue://", 6)  == 0) {
 
 			// Parse chapter number
-			char *chap = url + strlen(url);
+			char *chap = clip + strlen(clip);
 			while(*--chap != '/');
 			*chap++ = '\0';
 			track.chapter = atoi(chap);
@@ -233,7 +225,7 @@ void load_playlist(char *playlist)
 
 			// Copy path
 			int prot_len = strlen("cue://");
-			strncpy( path, url+prot_len , MAX_PATH_LEN );
+			strncpy( path, clip+prot_len , MAX_PATH_LEN );
 
 
 			char *string = scuep_read_file( path );
@@ -307,7 +299,14 @@ void load_playlist(char *playlist)
 			track.length,
 			track.chapter
 		);
+		printf( "url: %s\n", track.url);
 
+		track_store(&track);
+
+		//track_id = playlist_push( &track );
+		// errorcheck!
+		//playlist_push( track_id );
+		
 		if(cue_cd) {
 			cd_delete(cue_cd);
 		}
@@ -316,6 +315,7 @@ void load_playlist(char *playlist)
 			taglib_file_free( tl_file );
 		}
 
+		tail = ++head;
 	}	
 }
 

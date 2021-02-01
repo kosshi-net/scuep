@@ -20,12 +20,12 @@
  * */
 
 // Returns a pointer to the filename of the provided path
-char *scuep_basename(char*c){
-	char *last = c;
+char *scuep_basename(const char*c){
+	const char *last = c;
 	while(*++c){
 		if( *c == '/' ) last = c;
 	}
-	return last+1;
+	return (char*)(last+1);
 }
 
 // Case insensitive widechar substring search

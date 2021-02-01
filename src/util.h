@@ -11,7 +11,7 @@
 
 
 // Strips directory from filename
-char *scuep_basename(char*c);
+char *scuep_basename(const char*c);
 
 // Case insensitive widechar substring search
 wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle);

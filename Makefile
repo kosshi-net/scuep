@@ -1,10 +1,11 @@
+
 NCURSES=	`pkg-config --libs --cflags ncursesw`
 LIBCUE=		`pkg-config --libs --cflags libcue`
 MPV=		`pkg-config --libs --cflags mpv`
 TAGLIB=		`pkg-config --libs --cflags taglib_c`
 SQLITE=		`pkg-config --libs --cflags sqlite3`
 
-CLFAGS = -Wall 
+CFLAGS = -Wall -ggdb
 
 BIN=scuep
 
@@ -18,14 +19,19 @@ CC = cc
 
 all: bin/scuep  bin/scuep-cue-to-urls
 
-$(sql_h): $(sql)
-	xxd -i $^ > $@;
 
 bin/scuep-cue-to-urls: src/scuep-cue-to-urls.c src/filehelper.h;
-	$(CC) src/scuep-cue-to-urls.c $(CLFAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
+	$(CC) src/scuep-cue-to-urls.c $(CFLAGS) $(LIBCUE)  -o bin/scuep-cue-to-urls
 
 bin/scuep: $(sql_h) $(obj)
-	$(CC) $^ -ltag $(CLFAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) $(SQLITE) -g -o $@
+	$(CC) $^ -ltag $(CFLAGS) $(NCURSES) $(LIBCUE) $(MPV) $(TAGLIB) $(SQLITE) -g -o $@
+
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(sql_h): $(sql)
+	xxd -i sql/reset.sql >  $@;
+	xxd -i sql/insert_track.sql >> $@;
 
 .PHONY: clean install uninstall
 clean:
@@ -60,4 +66,3 @@ uninstall:
 		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
 		"$(DESTDIR)$(PREFIX)/bin/scuep"
-
