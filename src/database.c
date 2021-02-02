@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <sqlite3.h>
 #include "sql.h"
@@ -12,7 +13,7 @@ static int db_check();
 static int db_prepare();
 
 
-#define SCUEP_FORMAT_VERSION 1
+#define SCUEP_FORMAT_VERSION 2
 
 static char    *path_database;
 static sqlite3 *db;
@@ -21,6 +22,13 @@ sqlite3_stmt **stmt_list[256];
 int	           stmt_list_count = 0;
 
 
+/*
+ * TODO
+ * Error handling
+ * Optimize multi-stmt queries to one (im dumb)
+ */
+	
+	
 /*  
  * Convenience function. Compiles SQL if not already, otherwise resets stmt.
  */
@@ -102,12 +110,12 @@ int db_reset()
 		return 1;
 	}
 
-	sql_reset_sql[sql_reset_sql_len-1]=0;
+	sql_schema_sql[sql_schema_sql_len-1]=0;
 
 	char *errmsg = NULL;
 	rc = sqlite3_exec( 
 		db,
-		(char*)sql_reset_sql,
+		(char*)sql_schema_sql,
 		NULL,
 		NULL,
 		&errmsg
@@ -134,16 +142,18 @@ int db_prepare()
 	
 /*
 	if (sqlite3_prepare_v2(db, 
-		"SELECT id FROM tracks WHERE url=?1",
+		"SELECT id FROM tracks WHERE uri=?1",
 		-1, &stmt_track_id_by_url, 0
 	) !=SQLITE_OK) goto prepare_error;
 */
 
 	// TEST CODE HERE
+	
+	if(0) goto error;
 
 	return 0;
 	
-	prepare_error:
+	error:
 	printf("Prepare error: %s\n", sqlite3_errmsg(db));
 	return 1;
 
@@ -210,25 +220,78 @@ int playlist_clear()
 
 }
 
-int playlist_push( int id )
+
+int playlist_count(void)
 {
-	// TODO
-	return 0;
+	int rc;
+	static sqlite3_stmt *stmt;
+	prepare( &stmt, "SELECT COUNT(*) FROM playlist");
+	
+	rc = sqlite3_step(stmt);
+
+	return sqlite3_column_int(stmt, 0);
+}
+
+TrackId playlist_track(int row)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+	prepare( &stmt, "SELECT track_id FROM playlist WHERE id=?1");
+
+	sqlite3_bind_int( stmt, 1, row );
+	
+	rc = sqlite3_step(stmt);
+
+	return sqlite3_column_int(stmt, 0);
 }
 
 
-int track_id_by_url( char* url )
+
+
+
+
+
+int playlist_push( TrackId id )
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+	rc = prepare( &stmt, "INSERT INTO playlist(track_id) VALUES (?1)");
+	
+	rc = sqlite3_bind_int( stmt, 1, id );
+
+	rc = sqlite3_step(stmt);
+
+	if (rc != SQLITE_DONE) goto error;
+		
+	return 0;
+	error:
+	return -1;
+
+}
+
+
+
+
+TrackId track_by_uri( const char* uri )
 {
 	int rc;
 	static sqlite3_stmt *stmt;
 	rc = prepare( &stmt, 
-		"SELECT id FROM tracks WHERE url=?1"
+		"SELECT id FROM tracks WHERE uri=?1"
 	);
+	rc = sqlite3_bind_text(stmt, 1, uri, -1, NULL );
+
 	if(rc != SQLITE_OK) goto error;
-	// TODO
-	return 0;
+
+	rc=sqlite3_step(stmt);
+	if(rc != SQLITE_ROW) goto error;
+	
+	return sqlite3_column_int(stmt, 0);
+
 	error:
-	return 1;
+	// TODO: discriminate between actual database errors and just lack of row
+	//fprintf(stderr, "Track ID fetch error: %s\n", sqlite3_errmsg(db));
+	return -1;
 }
 
 
@@ -254,8 +317,99 @@ int insert_ignore_select(
 	return -1;
 }
 
-//struct ScuepTrackUTF8 *track_load ( int id );
-int track_store( struct ScuepTrackUTF8 *track )
+void *track_free( struct ScuepTrack*track )
+{
+	if(!track) return NULL;
+
+	if (track->uri)    free(track->uri);
+	if (track->path)   free(track->path);
+
+	if (track->title)  free(track->title);
+	if (track->artist) free(track->artist);
+	if (track->album)  free(track->album);
+
+	free(track);
+
+	return NULL;
+}
+
+struct ScuepTrack *track_load ( int id )
+{
+	int rc=0;
+	static sqlite3_stmt *stmt;
+	static sqlite3_stmt *stmt_artist;
+	static sqlite3_stmt *stmt_album;
+
+	struct ScuepTrack *track = NULL;
+
+	prepare( &stmt,
+		"SELECT  "
+		"uri, "
+		"title, "
+		"artist_id, "
+		"album_id, "
+		"pcm_start, " // 4
+		"pcm_length, "
+		"pcm_chapter, "
+		"bitmask "
+		" FROM tracks WHERE id=?1;"
+	);
+	prepare( &stmt_artist, "SELECT (name) FROM artists WHERE id=(?1)" );
+	prepare( &stmt_album,  "SELECT (name) FROM albums  WHERE id=(?1)" );
+
+	rc=sqlite3_bind_int(stmt, 1, id);
+	if (rc != SQLITE_OK) goto error;
+
+
+	rc=sqlite3_step(stmt);
+	if (rc != SQLITE_ROW) goto error;
+	
+
+	track = calloc(1,sizeof(struct ScuepTrack));
+
+	const char *uri   = sqlite3_column_text(stmt, 0);
+	const char *title = sqlite3_column_text(stmt, 1);
+
+	track->uri   = calloc( sqlite3_column_bytes(stmt, 0)+1, 1 );
+	track->title = calloc( sqlite3_column_bytes(stmt, 1)+1, 1 );
+
+	strcpy(track->uri,   uri);
+	strcpy(track->title, title);
+	
+	track->start  = sqlite3_column_int(stmt, 4);
+	track->length = sqlite3_column_int(stmt, 5);
+	track->chapter= sqlite3_column_int(stmt, 6);
+	track->mask   = sqlite3_column_int(stmt, 7);
+	
+	int artist_id = sqlite3_column_int( stmt, 2 );
+	int album_id  = sqlite3_column_int( stmt, 3 );
+
+	sqlite3_bind_int(stmt_artist, 1, artist_id);
+	sqlite3_bind_int(stmt_album,  1, album_id);
+
+	rc=sqlite3_step(stmt_artist);
+	if (rc != SQLITE_ROW) goto error;
+	rc=sqlite3_step(stmt_album);
+	if (rc != SQLITE_ROW) goto error;
+	
+	const char *artist = sqlite3_column_text( stmt_artist, 0 );
+	const char *album  = sqlite3_column_text( stmt_album,  0 );
+
+	track->artist = calloc( sqlite3_column_bytes(stmt_artist, 0)+1, 1 );
+	track->album  = calloc( sqlite3_column_bytes(stmt_album,  0)+1, 1 );
+	
+	strcpy(track->artist, artist);
+	strcpy(track->album,  album);
+
+	return track;
+
+	error:
+	fprintf(stderr, "Track load error: %s\n", sqlite3_errmsg(db));
+	return NULL;
+}
+
+
+int track_store( struct ScuepTrack*track )
 {
 	static sqlite3_stmt *stmt_ins_track;
 
@@ -293,11 +447,11 @@ int track_store( struct ScuepTrackUTF8 *track )
 	int rc;
 	int k = 1;
 
-	printf("store url %s\n", track->url);
+	printf("store uri %s\n", track->uri);
 
 	stmt=stmt_ins_track;
 	// Neat but assumes SQLITE_OK is always zero, is that ok?
-	rc=(sqlite3_bind_text(stmt, k++, track->url, -1, NULL)
+	rc=(sqlite3_bind_text(stmt, k++, track->uri, -1, NULL)
 	||	sqlite3_bind_text(stmt, k++, track->title, -1, NULL)
 	||	sqlite3_bind_int( stmt, k++, artist_id )
 	||	sqlite3_bind_int( stmt, k++, album_id )
@@ -307,7 +461,6 @@ int track_store( struct ScuepTrackUTF8 *track )
 	||	sqlite3_bind_int( stmt, k++, track->mask )
 	);
 	if(rc != SQLITE_OK) goto error;
-	printf("Binds OK\n");
 	
 	rc = sqlite3_step( stmt );
 	if(rc != SQLITE_DONE) goto error;

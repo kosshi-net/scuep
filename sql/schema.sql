@@ -22,7 +22,7 @@ CREATE TABLE artists (
 CREATE TABLE tracks (
     id              INTEGER         NOT NULL    PRIMARY KEY,
 
-    url             TEXT UNIQUE     NOT NULL,
+    uri             TEXT UNIQUE     NOT NULL,
 
     title           TEXT            NOT NULL,
     album_id        INTEGER,

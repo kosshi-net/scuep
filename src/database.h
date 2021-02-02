@@ -1,23 +1,55 @@
 #ifndef SCUEP_DATABASE_H
 #define SCUEP_DATABASE_H
 
-#include "track.h"
+
+
+
+
+typedef int TrackId;
+
+struct ScuepTrack {
+	char *uri;
+	char *path;
+
+	char *title;
+	char *artist;
+	char *album;
+
+	int32_t start;
+	int32_t length;
+	int32_t chapter;
+	int32_t mask;
+};
+
+/*
+ * The only function that will ever return a struct ScuepTrack* is the load
+ * function. Every other query/find etc returns a TrackId.
+ */
+
+struct ScuepTrack *track_load ( TrackId );
+
+int track_store( struct ScuepTrack *);
+
+// Always returns NULL
+void *track_free(struct ScuepTrack *);
+
+
+TrackId track_by_uri( const char* );
+
+
 
 int db_init( char* );
 int db_reset( void );
 
+
 int db_intvar_load  (const char *key);
 int db_intvar_store (const char *key, int val);
 
+// Playlist is one indexed!!!
 
-int track_id_by_url( char* url );
-
-struct ScuepTrackUTF8 *track_load ( int id );
-int                    track_store( struct ScuepTrackUTF8 *);
-
-
-int playlist_clear(void);
-int playlist_push( int id );
-
+int     playlist_count(void);
+int     playlist_clear(void);
+int     playlist_push (TrackId);
+TrackId playlist_track(int);
 
 #endif

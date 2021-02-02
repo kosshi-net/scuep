@@ -11,7 +11,7 @@ BIN=scuep
 
 src = src/scuep.c src/database.c src/util.c src/log.c
 obj = $(src:.c=.o)
-sql = sql/reset.sql
+sql = sql/schema.sql
 sql_h = src/sql.h
 
 PREFIX = /usr/local
@@ -30,7 +30,7 @@ src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(sql_h): $(sql)
-	xxd -i sql/reset.sql >  $@;
+	xxd -i sql/schema.sql >  $@;
 	xxd -i sql/insert_track.sql >> $@;
 
 .PHONY: clean install uninstall

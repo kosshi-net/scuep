@@ -1,4 +1,4 @@
-INSERT INTO tracks (
+SELECT (
 	uri,
 	title, 
 	artist_id,
@@ -7,13 +7,5 @@ INSERT INTO tracks (
 	pcm_length,
 	pcm_chapter,
 	bitmask
-) VALUES (
-	?1,
-	?2,
-	?3,
-	?4,
-	?5,
-	?6,
-	?7,
-	?8
-);
+) FROM tracks WHERE (id=?1);
+
