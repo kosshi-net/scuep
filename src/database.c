@@ -8,12 +8,14 @@
 #include "sql.h"
 
 #include "database.h"
+#include "uri.h"
+#include "util.h"
 
 static int db_check();
 static int db_prepare();
 
 
-#define SCUEP_FORMAT_VERSION 2
+#define SCUEP_FORMAT_VERSION 1
 
 static char    *path_database;
 static sqlite3 *db;
@@ -321,12 +323,14 @@ void *track_free( struct ScuepTrack*track )
 {
 	if(!track) return NULL;
 
-	if (track->uri)    free(track->uri);
-	if (track->path)   free(track->path);
+	if (track->uri)      free(track->uri);
+	if (track->path)     free(track->path);
+	if (track->dirname)  free(track->dirname);
+	if (track->basename) free(track->basename);
 
-	if (track->title)  free(track->title);
-	if (track->artist) free(track->artist);
-	if (track->album)  free(track->album);
+	if (track->title)    free(track->title);
+	if (track->artist)   free(track->artist);
+	if (track->album)    free(track->album);
 
 	free(track);
 
@@ -351,7 +355,8 @@ struct ScuepTrack *track_load ( int id )
 		"pcm_start, " // 4
 		"pcm_length, "
 		"pcm_chapter, "
-		"bitmask "
+		"bitmask, "
+		"basename "
 		" FROM tracks WHERE id=?1;"
 	);
 	prepare( &stmt_artist, "SELECT (name) FROM artists WHERE id=(?1)" );
@@ -367,15 +372,21 @@ struct ScuepTrack *track_load ( int id )
 
 	track = calloc(1,sizeof(struct ScuepTrack));
 
-	const char *uri   = sqlite3_column_text(stmt, 0);
-	const char *title = sqlite3_column_text(stmt, 1);
-
+	const char *uri      = (const char*)sqlite3_column_text(stmt, 0);
+	const char *title    = (const char*)sqlite3_column_text(stmt, 1);
+	const char *basename = (const char*)sqlite3_column_text(stmt, 8);
+/*
 	track->uri   = calloc( sqlite3_column_bytes(stmt, 0)+1, 1 );
 	track->title = calloc( sqlite3_column_bytes(stmt, 1)+1, 1 );
 
 	strcpy(track->uri,   uri);
 	strcpy(track->title, title);
-	
+*/
+
+	track->uri      = scuep_strdup( uri );
+	track->title    = scuep_strdup( title );
+	track->basename = scuep_strdup( basename );
+
 	track->start  = sqlite3_column_int(stmt, 4);
 	track->length = sqlite3_column_int(stmt, 5);
 	track->chapter= sqlite3_column_int(stmt, 6);
@@ -392,8 +403,8 @@ struct ScuepTrack *track_load ( int id )
 	rc=sqlite3_step(stmt_album);
 	if (rc != SQLITE_ROW) goto error;
 	
-	const char *artist = sqlite3_column_text( stmt_artist, 0 );
-	const char *album  = sqlite3_column_text( stmt_album,  0 );
+	const char *artist = (const char*)sqlite3_column_text( stmt_artist, 0 );
+	const char *album  = (const char*)sqlite3_column_text( stmt_album,  0 );
 
 	track->artist = calloc( sqlite3_column_bytes(stmt_artist, 0)+1, 1 );
 	track->album  = calloc( sqlite3_column_bytes(stmt_album,  0)+1, 1 );
@@ -401,6 +412,11 @@ struct ScuepTrack *track_load ( int id )
 	strcpy(track->artist, artist);
 	strcpy(track->album,  album);
 
+	char *uripath = path_from_uri(track->uri);
+	track->dirname  = scuep_dirname(uripath);
+	
+	track->path = scuep_strcat(scuep_strdup(track->dirname), track->basename );
+	free(uripath);
 	return track;
 
 	error:
@@ -450,8 +466,8 @@ int track_store( struct ScuepTrack*track )
 	printf("store uri %s\n", track->uri);
 
 	stmt=stmt_ins_track;
-	// Neat but assumes SQLITE_OK is always zero, is that ok?
 	rc=(sqlite3_bind_text(stmt, k++, track->uri, -1, NULL)
+	||	sqlite3_bind_text(stmt, k++, track->basename, -1, NULL)
 	||	sqlite3_bind_text(stmt, k++, track->title, -1, NULL)
 	||	sqlite3_bind_int( stmt, k++, artist_id )
 	||	sqlite3_bind_int( stmt, k++, album_id )

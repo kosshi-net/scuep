@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <poll.h>
+#include <uchar.h>
+
 
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -23,20 +25,17 @@
 #include "log.h"
 
 #include "database.h"
+#include "player.h"
 
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 1
 #define SCUEP_VERSION_MINOR 0
-
 
 static char path_config_folder	[1024];
 static char path_database		[1024];
 static void load_playlist(char *playlist);
 
 static bool ro = 0;
-
-
-sqlite3 *db;
 
 void scuep_exit(const char *error);
 
@@ -147,11 +146,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-
 	if( !input_file ){
 		scuep_exit("No input file. Required for this development version");
 	}
-
 	
 	if (db_init( path_database )) {
 		fprintf(stderr, "Database error\n");
@@ -180,15 +177,22 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		printf( "Title: %s\nArtist: %s\nAlbum %s\n",
+		printf( "Title: %s\nArtist: %s\nAlbum %s\nFile %s\n",
 			track->title,
 			track->artist,
-			track->album
+			track->album,
+			track->path
 		);
 
 		track_free(track);
 
 	}
+	
+	printf("Test decode\n");
+	struct ScuepTrack *track = track_load( playlist_track(1) );
+	printf( "%s\n", track->title );
+	player_load(track);
+
 }
 
 #define CD_FRAMERATE 75
@@ -198,11 +202,14 @@ int main(int argc, char **argv)
 #define LOAD_PLAYLIST_INCLUDE 1
 #ifdef LOAD_PLAYLIST_INCLUDE
 
+// TODO: Use strdup instead of const disgarding, move it to import.c and split 
+// it up more
 void load_playlist(char *playlist)
 {
 	//int track_count = 1;
 	//do{ if(*c=='\n') track_count++; } while(*++c);
 	
+
 	char clip[4096];
 	char path[MAX_PATH_LEN];
 
@@ -237,7 +244,6 @@ void load_playlist(char *playlist)
 
 		struct ScuepTrack track;
 		memset(&track, 0, sizeof(struct ScuepTrack));
-		track.path = path;
 		track.uri  = uri;
 
 		if (strncmp(&uri[0], "cue://", 6)  == 0) {
@@ -272,9 +278,15 @@ void load_playlist(char *playlist)
 			track.album  = cdtext_get( PTI_TITLE, cdtext );
 			track.artist = cdtext_get( PTI_PERFORMER, tracktext );
 			track.title  = cdtext_get( PTI_TITLE, tracktext );
+			printf("FRAME %li\n", track_get_start(cue_track) );
+			track.start  = track_get_start  (cue_track) / (CD_FRAMERATE*0.001);
+			track.length = track_get_length (cue_track) / (CD_FRAMERATE*0.001);
+						
+			track.basename   = track_get_filename(cue_track);
+			track.dirname    = scuep_dirname(path);
+			printf("BASENAME %s\n", track.basename);
+			printf("DIRNAME  %s\n", track.dirname);
 
-			track.start  = track_get_start  (cue_track) / CD_FRAMERATE;
-			track.length = track_get_length (cue_track) / CD_FRAMERATE;
 			if(track.length == 0) {
 				// Length of the last chapter cant be parsed from the cue sheet 
 				// Use taglib to get the length of the whole file
@@ -285,7 +297,10 @@ void load_playlist(char *playlist)
 
 				tl_file = taglib_file_new( cue_path );
 				const TagLib_AudioProperties *tl_prop = taglib_file_audioproperties( tl_file ); 
-				track.length = taglib_audioproperties_length( tl_prop ) - track.start;
+				track.length = 
+					  taglib_audioproperties_length( tl_prop ) 
+					* 1000 
+					- track.start;
 			}
 		}
 		else{ // Misc file, use taglib
@@ -299,6 +314,9 @@ void load_playlist(char *playlist)
 				scuep_exit( path );
 			}
 
+			track.basename = scuep_strdup( scuep_basename(path) );
+			track.dirname  = scuep_dirname( path );
+
 			tl_file     = taglib_file_new( uri );
 
 			TagLib_Tag  *tl_tag = taglib_file_tag( tl_file );
@@ -309,7 +327,7 @@ void load_playlist(char *playlist)
 			const TagLib_AudioProperties *tl_prop = taglib_file_audioproperties( tl_file );
 
 			track.start = 0;
-			track.length = taglib_audioproperties_length( tl_prop );
+			track.length = taglib_audioproperties_length( tl_prop ) * 1000;
 			track.chapter 	 = -1;
 		}
 

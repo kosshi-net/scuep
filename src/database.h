@@ -1,22 +1,28 @@
 #ifndef SCUEP_DATABASE_H
 #define SCUEP_DATABASE_H
 
-
+#include <stdint.h>
 
 
 
 typedef int TrackId;
 
 struct ScuepTrack {
-	char *uri;
+	char *uri; 
+
 	char *path;
+
+	char *basename; 
+	char *dirname;
 
 	char *title;
 	char *artist;
 	char *album;
-
+	
+	// In milliseconds
 	int32_t start;
 	int32_t length;
+
 	int32_t chapter;
 	int32_t mask;
 };

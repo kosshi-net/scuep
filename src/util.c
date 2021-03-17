@@ -13,19 +13,47 @@
 
 #include <wchar.h>
 
+#include "util.h"
+
 /*
  * STRING UTILIES
  *
- * Some of these are defined in some systems, prefix with scuep!
- * */
+ * Some stdlib/posix string functions like basename and dirname have issues 
+ * like lack of thread safety. Such rewritten functions here can have 
+ * different interface and behavior.
+ */
 
-// Returns a pointer to the filename of the provided path
+
 char *scuep_basename(const char*c){
 	const char *last = c;
 	while(*++c){
 		if( *c == '/' ) last = c;
 	}
 	return (char*)(last+1);
+}
+
+char *scuep_dirname(const char*path){
+	char *dir = scuep_strdup( path );
+	*scuep_basename( dir ) = 0;
+	return dir;
+}
+
+char *scuep_strdup(const char*str){
+	char *dup = malloc( strlen(str)+1 );
+	strcpy(dup, str);
+	return dup;
+}
+
+char *scuep_strcat( char *dest, char *src ){
+	
+	size_t dest_len = strlen(dest);
+	size_t src_len  = strlen(src);
+
+	char *ret = realloc ( dest, dest_len+src_len+1 );
+
+	memcpy( ret+dest_len, src, src_len+1 );
+
+	return ret;
 }
 
 // Case insensitive widechar substring search

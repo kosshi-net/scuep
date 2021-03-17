@@ -23,6 +23,7 @@ CREATE TABLE tracks (
     id              INTEGER         NOT NULL    PRIMARY KEY,
 
     uri             TEXT UNIQUE     NOT NULL,
+    basename        TEXT,
 
     title           TEXT            NOT NULL,
     album_id        INTEGER,

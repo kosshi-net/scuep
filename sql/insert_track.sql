@@ -1,5 +1,6 @@
 INSERT INTO tracks (
 	uri,
+	basename,
 	title, 
 	artist_id,
 	album_id,
@@ -15,5 +16,6 @@ INSERT INTO tracks (
 	?5,
 	?6,
 	?7,
-	?8
+	?8,
+	?9
 );
