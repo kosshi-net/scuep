@@ -17,7 +17,7 @@ SRCDIR=src
 OBJDIR=obj
 BINDIR=bin
 
-src_pre = main.c database.c util.c log.c player.c uri.c
+src_pre = main.c database.c util.c log.c player.c uri.c frontend.c
 obj_pre = $(src_pre:.c=.o)
 
 src = $(addprefix $(SRCDIR)/, $(src_pre) )
@@ -49,34 +49,4 @@ $(sql_h): $(sql)
 .PHONY: clean install uninstall
 clean:
 	rm $(obj) $(sql_h) bin/scuep-cue-to-urls bin/scuep
-
-
-install: all
-	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp \
-		"bin/scuep" \
-		"bin/scuep-remote" \
-		"bin/scuep-cue-scanner" \
-		"bin/scuep-media-scanner" \
-		"bin/scuep-dedup" \
-		"bin/scuep-cue-to-urls" \
-		$(DESTDIR)$(PREFIX)/bin 
-	chmod 755 \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-scanner" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep"
-
-
-
-uninstall:
-	rm -f \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-scanner" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
-		"$(DESTDIR)$(PREFIX)/bin/scuep"
 

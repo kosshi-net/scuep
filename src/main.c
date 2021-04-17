@@ -1,4 +1,6 @@
-#define _XOPEN_SOURCE 
+#include "config.h"
+#include <stdio.h>
+
 #include <taglib/tag_c.h>	
 #include <libcue/libcue.h>
 #include <sqlite3.h>
@@ -13,7 +15,7 @@
 #include <stdbool.h>
 #include <poll.h>
 #include <uchar.h>
-
+#include <locale.h>
 
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -26,14 +28,15 @@
 
 #include "database.h"
 #include "player.h"
+#include "frontend.h"
 
 #define SCUEP_TITLE "scuep"
 #define SCUEP_VERSION_MAJOR 1
 #define SCUEP_VERSION_MINOR 0
 
-static char path_config_folder	[1024];
-static char path_database		[1024];
-static void load_playlist(char *playlist);
+static char *path_config_folder;
+static char *path_database;
+static void  load_playlist(char *playlist);
 
 static bool ro = 0;
 
@@ -55,6 +58,7 @@ enum Flag {
 	flag_help,
 	flag_version,
 	flag_ro,
+	flag_reset,
 	flag_debug,
 	flag_stdin
 };
@@ -62,14 +66,22 @@ enum Flag parse_flag( char* str )
 {
 	if(strcmp(str, "--help"
 	)==0) return flag_help;
+
 	if(strcmp(str, "--version"
 	)==0) return flag_version;
+
 	if(strcmp(str, "--readonly"
 	)==0) return flag_ro;
+
+	if(strcmp(str, "--reset"
+	)==0) return flag_reset;
+
 	if(strcmp(str, "--debug"
 	)==0) return flag_debug;
+
 	if(strcmp(str, "-"
 	)==0) return flag_stdin;
+
 	if(strcmp(str, "-i"
 	)==0) return flag_stdin;
 
@@ -92,22 +104,41 @@ enum Flag parse_flag( char* str )
 "-i, -\n" \
 "    Read playlist from stdin\n" 
 
+
+int build_config_paths(){
+	char *cfgroot = getenv("XDG_CONFIG_HOME");
+
+	if( !cfgroot ){
+		char *home = getenv("HOME");
+		asprintf( &cfgroot, "%s/.config", home );
+	}
+
+	asprintf(&path_config_folder, "%s/scuep-dev", cfgroot );
+	asprintf(&path_database, "%s/scuep.db", path_config_folder );
+
+	if( access( cfgroot, W_OK ) ){
+		fprintf(stderr, "%s is not a valid config path\n", cfgroot);
+		return -1;
+	}
+	
+	if( access( path_config_folder, W_OK ) ){
+		mkdir( path_config_folder, 0700 );
+	}
+
+	printf("%s\n", path_config_folder);
+	printf("%s\n", path_database);
+
+	return 0;
+}
+
+
 int main(int argc, char **argv)
 {
-	char *home = getenv("HOME");
+	setlocale(LC_ALL,"");
 
-	snprintf(  path_config_folder, 	
-		sizeof(path_config_folder),
-		"%s/.config/scuep", home
-	);
-	snprintf(  path_database,
-		sizeof(path_database),
-		"%s/scuep.db", path_config_folder
-	);
-
+	if( build_config_paths() ) return -1;
 
 	char *input_file = NULL;
-
 	
 	for(int i = 1; i < argc; i++){
 		char *arg = argv[i];
@@ -135,6 +166,10 @@ int main(int argc, char **argv)
 			case flag_debug:
 				//scuep_log_start();
 				break;
+			case flag_reset:
+				unlink(path_database);
+				printf("Database reset\n");
+				break;
 			default:
 				// Assume its a file
 				input_file = read_file(arg);
@@ -150,7 +185,7 @@ int main(int argc, char **argv)
 		scuep_exit("No input file. Required for this development version");
 	}
 	
-	if (db_init( path_database )) {
+	if (db_initialize( path_database )) {
 		fprintf(stderr, "Database error\n");
 		return 1;
 	}else{
@@ -158,41 +193,10 @@ int main(int argc, char **argv)
 	}
 
 	playlist_clear();
-
 	load_playlist( input_file );
-
-	
-	printf("\nPlaylist load done\n\n");
-	int count = playlist_count();
-	printf("Playlist length %i", playlist_count());
-
-	for( int i = 1; i <= count; i++ ){
-		TrackId track_id = playlist_track(i);
-		printf("Item #%i TrackId %i\n", i, track_id);
-		
-		struct ScuepTrack *track = track_load(track_id);
-
-		if( !track ){
-			fprintf(stderr, "Failed to load track\n");
-			continue;
-		}
-
-		printf( "Title: %s\nArtist: %s\nAlbum %s\nFile %s\n",
-			track->title,
-			track->artist,
-			track->album,
-			track->path
-		);
-
-		track_free(track);
-
-	}
-	
-	printf("Test decode\n");
-	struct ScuepTrack *track = track_load( playlist_track(1) );
-	printf( "%s\n", track->title );
-	player_load(track);
-
+	frontend_initialize();
+	frontend_terminate();
+	db_terminate();
 }
 
 #define CD_FRAMERATE 75
@@ -203,12 +207,13 @@ int main(int argc, char **argv)
 #ifdef LOAD_PLAYLIST_INCLUDE
 
 // TODO: Use strdup instead of const disgarding, move it to import.c and split 
-// it up more
+// it up more, make it return on error instead of calling exit()
 void load_playlist(char *playlist)
 {
 	//int track_count = 1;
 	//do{ if(*c=='\n') track_count++; } while(*++c);
 	
+	transaction_begin();
 
 	char clip[4096];
 	char path[MAX_PATH_LEN];
@@ -217,6 +222,12 @@ void load_playlist(char *playlist)
 	const char  *tail = playlist;
 
 	for (int i = 0; ; ++i) {
+		
+		// Save progress for large scans
+		if( i % 1000 == 0 && i){
+			transaction_end();
+			transaction_begin();
+		}
 
 		Cd          *cue_cd  = NULL;
 		TagLib_File *tl_file = NULL;
@@ -224,7 +235,7 @@ void load_playlist(char *playlist)
 		TrackId track_id = -1;
 
 		while( *head && *head != '\n' ) head++;
-		if(*head=='\0') return; // END OF LINE
+		if(*head=='\0') goto finish; // END OF LINE
 		*head = '\0';
 		
 		strcpy(clip, tail);
@@ -319,6 +330,7 @@ void load_playlist(char *playlist)
 
 			tl_file     = taglib_file_new( uri );
 
+
 			TagLib_Tag  *tl_tag = taglib_file_tag( tl_file );
 			track.title  = taglib_tag_title (tl_tag);
 			track.artist = taglib_tag_artist(tl_tag);
@@ -362,7 +374,10 @@ void load_playlist(char *playlist)
 			taglib_file_free( tl_file );
 		}
 		tail = ++head;
-	}	
+	}
+finish:
+	transaction_end();
+	return;
 }
 
 

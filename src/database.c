@@ -10,9 +10,11 @@
 #include "database.h"
 #include "uri.h"
 #include "util.h"
+#include "log.h"
 
 static int db_check();
 static int db_prepare();
+static int db_stmt_finalize_all();
 
 
 #define SCUEP_FORMAT_VERSION 1
@@ -45,12 +47,12 @@ int prepare (sqlite3_stmt **stmt, const char *sql)
 
 	if(rc == SQLITE_OK) {
 		stmt_list[stmt_list_count++] = stmt;
-		printf("Prepared %s\n", sql);
+		scuep_logf("Prepared %s\n", sql);
 		return rc;
 	} 
 	
-	printf("During statement: %s", sql);
-	printf("Prepare error: %s\n", sqlite3_errmsg(db));
+	scuep_logf("During statement: %s", sql);
+	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
 	
 	return rc;
 }
@@ -60,13 +62,13 @@ int prepare (sqlite3_stmt **stmt, const char *sql)
  * Do whatever it takes to get a functioning database.
  * Returns 1 if fails.
  * */
-int db_init( char* _path_database )
+int db_initialize( char* _path_database )
 {
 	path_database = _path_database;
 
 	int rc = sqlite3_open( path_database, &db );
 	if (rc != SQLITE_OK) {
-		printf("Cannot open %s\n", path_database);
+		scuep_logf("Cannot open %s\n", path_database);
 		return 1;
 	}
 
@@ -79,14 +81,32 @@ int db_init( char* _path_database )
 	return 0;
 }
 
-int db_finalize(){
+int db_terminate()
+{
+	db_stmt_finalize_all();
+	sqlite3_close(db);
+
+	return 0;
+}
+
+int transaction_begin(){
+	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+	return 0;
+}
+int transaction_end(){
+	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+	return 0;
+}
+
+
+int db_stmt_finalize_all(){
 
 	for( int i = 0; i < stmt_list_count; i++ ){
 		sqlite3_finalize( *stmt_list[i] );
 		*stmt_list[i] = NULL;
 	}
 
-	printf("Finalized %i\n", stmt_list_count);
+	scuep_logf("Finalized %i\n", stmt_list_count);
 	stmt_list_count = 0;
 	return 0;
 }
@@ -101,10 +121,9 @@ int db_check()
 
 int db_reset()
 {
-	printf("Database reset\n");
+	scuep_logf("Database reset\n");
 
-	db_finalize();
-	sqlite3_close(db);
+	db_terminate();
 	remove(path_database);
 
 	int rc = sqlite3_open( path_database, &db );
@@ -134,7 +153,7 @@ int db_reset()
 
 	db_intvar_store("version", SCUEP_FORMAT_VERSION);
 	int read_ver = db_intvar_load("version");
-	printf("DB Version %i\n", read_ver);
+	scuep_logf("DB Version %i\n", read_ver);
 	return read_ver != SCUEP_FORMAT_VERSION;
 
 }
@@ -156,7 +175,7 @@ int db_prepare()
 	return 0;
 	
 	error:
-	printf("Prepare error: %s\n", sqlite3_errmsg(db));
+	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
 	return 1;
 
 }
@@ -287,8 +306,9 @@ TrackId track_by_uri( const char* uri )
 
 	rc=sqlite3_step(stmt);
 	if(rc != SQLITE_ROW) goto error;
-	
-	return sqlite3_column_int(stmt, 0);
+	int id = sqlite3_column_int(stmt, 0);
+
+	return id; 
 
 	error:
 	// TODO: discriminate between actual database errors and just lack of row
@@ -458,12 +478,12 @@ int track_store( struct ScuepTrack*track )
 		track->  album
 	);
 
-	printf("track_store: %i %i\n", artist_id, album_id);
+	scuep_logf("track_store: %i %i\n", artist_id, album_id);
 
 	int rc;
 	int k = 1;
 
-	printf("store uri %s\n", track->uri);
+	scuep_logf("store uri %s\n", track->uri);
 
 	stmt=stmt_ins_track;
 	rc=(sqlite3_bind_text(stmt, k++, track->uri, -1, NULL)

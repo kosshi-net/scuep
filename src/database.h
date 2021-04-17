@@ -44,12 +44,16 @@ TrackId track_by_uri( const char* );
 
 
 
-int db_init( char* );
-int db_reset( void );
+int  db_initialize( char* );
+int  db_terminate();
 
+int  db_reset( void );
 
-int db_intvar_load  (const char *key);
-int db_intvar_store (const char *key, int val);
+int  db_intvar_load  (const char *key);
+int  db_intvar_store (const char *key, int val);
+
+int  transaction_begin(void);
+int  transaction_end(void);
 
 // Playlist is one indexed!!!
 
@@ -57,5 +61,7 @@ int     playlist_count(void);
 int     playlist_clear(void);
 int     playlist_push (TrackId);
 TrackId playlist_track(int);
+
+
 
 #endif

@@ -38,12 +38,16 @@ wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle);
  * Copies characters, calculating their printed width, until max_width is 
  * reached 
  */
-uint32_t scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width );
+int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width );
  
 /*
  * Reallocates dest and adds src to it. 
  */
 char *scuep_strcat( char *dest, char *src );
+
+void sleep_ms( uint32_t );
+
+time_t time_ms(void);
 
 // Returns true when str starts with pre
 bool prefix(const char *pre, const char *str);

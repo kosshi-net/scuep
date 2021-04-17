@@ -1,4 +1,5 @@
-#define _XOPEN_SOURCE
+#include "config.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -12,6 +13,9 @@
 #include <stdint.h>
 
 #include <wchar.h>
+
+#include <unistd.h>
+#include <time.h>
 
 #include "util.h"
 
@@ -87,16 +91,27 @@ wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
 
 
 
-// Copies characters, calculating their printed width, until max_width is 
-// reached
-uint32_t scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width ){
-	size_t width = 0;
-	while(*wc && width < max_width){
-		*dst++ = *wc;
-		width += wcwidth( *wc++ );
+/* 
+ * Copies characters until total glyph width exceeds max_width. If source text
+ * was not cut, returns 0, otherwise returns total glyph width. 
+ */
+int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width ){
+
+	*width = 0;
+	while(*wc){
+		int gw = wcwidth(*wc);
+
+		if(*width+gw > max_width ){
+			*dst++ = 0;
+			return 1;
+		}
+
+		*dst++ = *wc++;
+		*width += gw;
 	}
+	
 	*dst++ = 0;
-	return width;
+	return 0;
 }
  
 // Returns true when str starts with pre
@@ -146,5 +161,22 @@ char *read_file(char *path){
 }
 
 
+void sleep_ms( uint32_t ms ){
+	// Why is usleep depricated????????!!!!!
+	
+	struct timespec tm;
 
+	tm.tv_sec  =  ms / 1000;
+	tm.tv_nsec = (ms % 1000) * 1000000;
+
+	nanosleep( &tm, &tm );
+
+}
+
+time_t time_ms(){
+    struct timespec t;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+	
+    return (t.tv_sec*1000L) + (t.tv_nsec/1000000L);
+}
 
