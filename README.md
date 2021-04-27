@@ -1,6 +1,11 @@
 # SCUEP - Simple CUE Player
 A simple terminal music player for GNU/Linux.
 
+## This branch is depricated
+Complete rewrite and redesign is (slowly) happening in branch ffsql. Once it reaches feature-parity with Master, this will be replaced and a first release scheduled soon™ after.
+
+The player in this branch is perfectly funcional even if little unpolished. However the codebase has outgrown itself.
+
 ## Still very much WORK IN PROGRESS!
 
 Features:
