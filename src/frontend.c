@@ -207,7 +207,7 @@ static uint32_t rcount = 0;
 
 void draw_carousel()
 {
-	mvprintw(0, 5, "%i, %lu", rcount++, time_ms());
+	mvprintw(0, 5, "%i, %lu, playlist: %i / %i", rcount++, time_ms(), cursor_pos , playlist_items);
 	static wchar_t wctext[1024] = {0};
 
 	int items = playlist_count();
@@ -232,7 +232,7 @@ void draw_carousel()
 			mvprintw( row, 1, ">" );
 		}
 		mbstowcs(wctext, track->title, 1023);
-		carousel_text(row, 2, 51, wctext, 0);
+		carousel_text(row, 2, 21, wctext, 0);
 		
 		mbstowcs(wctext, track->artist, 1023);
 		carousel_text(row, term_cols-2-31-5-21, 21, wctext, 0);

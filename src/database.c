@@ -94,7 +94,7 @@ int transaction_begin(){
 	return 0;
 }
 int transaction_end(){
-	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+	sqlite3_exec(db, "END TRANSACTION", NULL, NULL, NULL);
 	return 0;
 }
 
@@ -306,9 +306,8 @@ TrackId track_by_uri( const char* uri )
 
 	rc=sqlite3_step(stmt);
 	if(rc != SQLITE_ROW) goto error;
-	int id = sqlite3_column_int(stmt, 0);
 
-	return id; 
+	return sqlite3_column_int(stmt, 0);
 
 	error:
 	// TODO: discriminate between actual database errors and just lack of row

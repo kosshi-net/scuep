@@ -1,16 +1,20 @@
 #include "database.h"
 #include "player.h"
 #include "util.h"
+#include "audiobuffer.h"
+
+#include "alsa.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 
+#include <threads.h> 
+
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libswresample/swresample.h>
-
+//#include <libswresample/swresample.h>
 
 struct TrackAV{
 	AVFormatContext *format;
@@ -33,6 +37,9 @@ struct TrackAV{
 
 
 static struct TrackAV av;
+
+
+
 
 
 void print_averr(int err){
@@ -104,17 +111,45 @@ int player_load(TrackId track_id)
 	ret = avcodec_parameters_to_context( codec_ctx, stream->codecpar );
 	if(ret<0) goto error;
 	
+	int sizeof_sample = av_get_bytes_per_sample(stream->codecpar->format);
+	int interleaved   = av_sample_fmt_is_planar(stream->codecpar->format);
+	int channels    = stream->codecpar->channels;
+	if(channels != 2) {
+		printf("Channel count of %i is not yet supported", channels);
+		goto error;
+	}
+	
+
+
 	{ // Print info about codecs and stuff
 		AVCodecParameters *param = stream->codecpar;
 		const char *format_str = av_get_sample_fmt_name(param->format);
-		printf( "%ihz %ic %s %s\n", 
+		printf( "%ihz %ic %s (%ib) %s\n", 
 				param->sample_rate, 
-				param->channels, 
+				channels,
 				format_str, 
+				sizeof_sample, 
 				codec->long_name 
 			);
 		printf("Timebase: %i / %i\n", stream->time_base.den, stream->time_base.num);
 	}
+
+	/**************
+	 * OPEN AUDIO *
+	 **************/
+	
+	struct AudioBuffer *abuf = audiobuf_create(stream->codecpar);
+	alsa_open( stream->codecpar, abuf );
+
+	// Fork a thread here
+
+	//decode_buf_create( sizeof_sample );
+	
+	
+	/****************
+	 * BEGIN DEOCDE *
+	 ****************/
+
 
 	ret = avcodec_open2(codec_ctx, codec, NULL);
 	if(ret<0) goto error;
@@ -123,7 +158,7 @@ int player_load(TrackId track_id)
 	AVFrame  *frame  = av_frame_alloc();
 
 	printf("Begin decode\n");
-	FILE *fp = fopen("decode.bin", "wb+");
+	//FILE *fp = fopen("decode.bin", "wb+");
 	int sample_count = 0;
 
 	while(1){
@@ -158,19 +193,29 @@ int player_load(TrackId track_id)
 
 			int cut_front = MAX( start_s - sample_pos, 0);
 			int cut_back  = MAX( (sample_pos+samples)-(start_s+length_s), 0);
+			int total     = samples-cut_front-cut_back;
 
 			if(cut_front || cut_back){
 				printf("%li, Frame %i+%i front %i, back %i\n", 
 						sample_pos,
 						codec_ctx->frame_number, 
 						frame->nb_samples, 
-						cut_front, cut_back
+						cut_front, total
 				);
 			}
 
 			sample_count += frame->nb_samples;
-			int total = samples-cut_front-cut_back;
-			fwrite( frame->data[1]+(cut_front*2), sizeof(uint16_t), total*2, fp );
+
+			
+			audiobuf_write(abuf, frame, cut_front, total);
+
+
+			// mp3; writes only 1 channel
+			//fwrite( frame->data[1]+(cut_front*2), sizeof(uint16_t), total*2, fp );
+			// flac; writes both channels properly because interleaved
+			//fwrite( frame->data[0]+(cut_front), sizeof(uint16_t), total*2, fp );
+			
+
 			total+= sample_count;
 			
 		}
@@ -181,7 +226,7 @@ int player_load(TrackId track_id)
 	finish:
 
 	printf("Stop decode, wrote %i\n", sample_count);
-	fclose(fp);
+	//fclose(fp);
 	return 0;
 
 	error:

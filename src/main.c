@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 				input_file = read_stdin();
 				break;
 			case flag_debug:
-				//scuep_log_start();
+				scuep_log_start();
 				break;
 			case flag_reset:
 				unlink(path_database);
@@ -194,8 +194,14 @@ int main(int argc, char **argv)
 
 	playlist_clear();
 	load_playlist( input_file );
-	frontend_initialize();
-	frontend_terminate();
+	transaction_end();
+
+	
+	player_load( playlist_track(1) );
+
+	//frontend_initialize();
+	//frontend_terminate();
+
 	db_terminate();
 }
 
@@ -223,11 +229,11 @@ void load_playlist(char *playlist)
 
 	for (int i = 0; ; ++i) {
 		
-		// Save progress for large scans
+		/* Save progress for large scans
 		if( i % 1000 == 0 && i){
 			transaction_end();
 			transaction_begin();
-		}
+		}*/
 
 		Cd          *cue_cd  = NULL;
 		TagLib_File *tl_file = NULL;
@@ -245,6 +251,7 @@ void load_playlist(char *playlist)
 		// if true, add id and continue
 		track_id = track_by_uri(uri);
 		
+		printf("track_id %i\n", track_id);
 
 		if( track_id > -1){
 			printf("track_id found %i, skip \n", track_id);
@@ -289,14 +296,13 @@ void load_playlist(char *playlist)
 			track.album  = cdtext_get( PTI_TITLE, cdtext );
 			track.artist = cdtext_get( PTI_PERFORMER, tracktext );
 			track.title  = cdtext_get( PTI_TITLE, tracktext );
-			printf("FRAME %li\n", track_get_start(cue_track) );
+			//printf("FRAME %li\n", track_get_start(cue_track) );
 			track.start  = track_get_start  (cue_track) / (CD_FRAMERATE*0.001);
 			track.length = track_get_length (cue_track) / (CD_FRAMERATE*0.001);
 						
 			track.basename   = track_get_filename(cue_track);
 			track.dirname    = scuep_dirname(path);
 			printf("BASENAME %s\n", track.basename);
-			printf("DIRNAME  %s\n", track.dirname);
 
 			if(track.length == 0) {
 				// Length of the last chapter cant be parsed from the cue sheet 
@@ -349,7 +355,7 @@ void load_playlist(char *playlist)
 
 		// if metadata failed to load, use filename instead
 		if( !track.title[0] )  track.title = scuep_basename(uri);
-		
+		/*
 		printf( "%s // %s // %s // %i - %is, #%i\n", \
 			track.title, 
 			track.artist, 
@@ -359,7 +365,7 @@ void load_playlist(char *playlist)
 			track.chapter
 		);
 		printf( "uri: %s\n", track.uri);
-
+		*/
 		// TODO errorcheck!
 		track_store(&track);
 		track_id = track_by_uri(uri);
@@ -376,6 +382,7 @@ void load_playlist(char *playlist)
 		tail = ++head;
 	}
 finish:
+	printf("Transaction end\n");
 	transaction_end();
 	return;
 }
