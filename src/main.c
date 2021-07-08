@@ -196,8 +196,11 @@ int main(int argc, char **argv)
 	load_playlist( input_file );
 	transaction_end();
 
-	
+	player_init();
 	player_load( playlist_track(1) );
+	player_play();
+	sleep_ms(5000);
+	player_stop();
 
 	//frontend_initialize();
 	//frontend_terminate();

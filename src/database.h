@@ -20,6 +20,7 @@ struct ScuepTrack {
 	char *album;
 	
 	// In milliseconds
+	// TODO: convert to samples
 	int32_t start;
 	int32_t length;
 

@@ -1,6 +1,6 @@
 #include "alsa.h"
 #include "log.h"
-#include "audiobuffer.h"
+#include "player.h"
 
 #include <alsa/asoundlib.h>
 #include <libavcodec/avcodec.h>
@@ -10,17 +10,16 @@
 
 #include <threads.h>
 
-char *device = "default";
-snd_output_t *output = NULL;
+static char *device = "default";
+static snd_pcm_t *handle = NULL;
 
-snd_pcm_t         *handle;
+static struct PlayerState *player = NULL;
 
-struct AudioBuffer *abuf = NULL;
-
-thrd_t thread;
+static thrd_t thread;
+static int    thread_run = 0;
 
 // A period of silence
-uint8_t *silence = NULL; 
+static uint8_t *silence = NULL; 
 
 
 snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
@@ -47,10 +46,10 @@ snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
 
 static int alsa_loop(void*arg);
 
-int alsa_open( AVCodecParameters *params, struct AudioBuffer *_abuf )
+int alsa_open( AVCodecParameters *params, struct PlayerState *_player )
 {
 	int err;
-	abuf = _abuf;
+	player = _player;
 
 	snd_pcm_format_t format = format_av2alsa( params->format );
 
@@ -59,7 +58,7 @@ int alsa_open( AVCodecParameters *params, struct AudioBuffer *_abuf )
 		return -1;
     }
 	
-	silence = calloc( abuf->period, abuf->sizeof_frame );
+	silence = calloc( player->period, player->sizeof_frame );
 
     if ((err = snd_pcm_set_params(handle,
 		format,
@@ -76,39 +75,47 @@ int alsa_open( AVCodecParameters *params, struct AudioBuffer *_abuf )
 
 	thrd_create( &thread, &alsa_loop, NULL );
 
+	player->sndsvr_close = alsa_close;
+
 	printf("Alsa open OK\n");
 
 	return 0;
 }
 
-void alsa_close(void){
+int alsa_close(void)
+{
+	player->sndsvr_close = NULL;
+	thread_run = 0;
+	thrd_join(thread, NULL);
 
+	return 0;
 }
 
 
-int alsa_loop(void*arg){
+int alsa_loop(void*arg)
+{
 	printf("Thread OK\n");
-
+	thread_run = 1;
 
 	snd_pcm_sframes_t  frames;
-	while(1){
+	while(thread_run){
 		
-		printf( "played: %i bufhp: %i\n", 
-			abuf->frames_played,
-			abuf->frames_decoded - abuf->frames_played 
+		printf( "played: %li bufhp: %li\n", 
+			player->frames_played,
+			player->frames_decoded - player->frames_played 
 		);
 
-		if( abuf->frames_played + abuf->period > abuf->frames_decoded ){
+		if( player->frames_played + player->period > player->frames_decoded ){
 			snd_pcm_writei(handle,
 				silence,
-				abuf->period
+				player->period
 			);
 			continue;
 		}
 
 		frames = snd_pcm_writei(handle,
-			abuf->data + abuf->tail * abuf->sizeof_frame,
-			abuf->period
+			player->data + player->tail * player->sizeof_frame,
+			player->period
 		);
 			
 		if( frames < 0 ) {
@@ -118,11 +125,17 @@ int alsa_loop(void*arg){
 			continue;
 		}
 
-		abuf->tail += frames;
-		abuf->tail %= abuf->frames;
-		abuf->frames_played += frames;
+		player->tail += frames;
+		player->tail %= player->frames;
+		player->frames_played += frames;
 
 	}
+
+	// TODO Don't clip
+	
+	snd_pcm_drop(handle);
+	snd_pcm_close(handle);
+	handle = NULL;
 
 	return 0;
 }

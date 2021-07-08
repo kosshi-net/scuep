@@ -3,9 +3,9 @@
 
 #include <libavcodec/avcodec.h>
 
-#include "audiobuffer.h"
+#include "player.h"
 
-int  alsa_open( AVCodecParameters*, struct AudioBuffer* );
-void alsa_close(void);
+int alsa_open( AVCodecParameters*, struct PlayerState* );
+int alsa_close(void);
 
 #endif

@@ -17,7 +17,7 @@ SRCDIR=src
 OBJDIR=obj
 BINDIR=bin
 
-src_pre = main.c database.c util.c log.c player.c uri.c frontend.c alsa.c audiobuffer.c
+src_pre = main.c database.c util.c log.c player.c uri.c frontend.c alsa.c 
 obj_pre = $(src_pre:.c=.o)
 
 src = $(addprefix $(SRCDIR)/, $(src_pre) )

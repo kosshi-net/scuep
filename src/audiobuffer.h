@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <threads.h>
 #include <libavcodec/avcodec.h>
+#include "database.h"
 
 struct AudioBuffer {
 	
@@ -23,11 +24,23 @@ struct AudioBuffer {
 	uint32_t head; // Writer
 	uint32_t tail; // Reader
 
-	uint64_t frames_played; // This is real position in audio stream
+	// Totals
+	uint64_t frames_played;
 	uint64_t frames_decoded;
 
-	enum AVSampleFormat format;
+	/* These are used to keep track of the real position in audio track.
+	 *
+	 * Decoder is allowed to begin decoding the next track before playback is
+	 * actually finished; seamless transitions.
+	 */
+	uint64_t progress;      
+	uint64_t progress_new;  
+	uint64_t progress_swap; 
 
+	TrackId track_id;
+	TrackId track_id_new;
+
+	enum AVSampleFormat format;
 
 };
 
