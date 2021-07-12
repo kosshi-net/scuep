@@ -197,10 +197,19 @@ int main(int argc, char **argv)
 	transaction_end();
 
 	player_init();
-	player_load( playlist_track(1) );
-	player_play();
-	sleep_ms(5000);
+	player_load( playlist_track(2) );
+	sleep_ms(1000);
+	sleep_ms(1000);
+	printf("\n\n\n\n\n\n\n");
+
+	player_load( playlist_track(2) );
+	sleep_ms(1000);
 	player_stop();
+	sleep_ms(1000);
+	printf("\n\n\n\n\n\n\n");
+
+
+
 
 	//frontend_initialize();
 	//frontend_terminate();

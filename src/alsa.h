@@ -5,7 +5,7 @@
 
 #include "player.h"
 
-int alsa_open( AVCodecParameters*, struct PlayerState* );
+int alsa_open( struct PlayerState* );
 int alsa_close(void);
 
 #endif

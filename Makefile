@@ -9,7 +9,8 @@ AVFORMAT=   `pkg-config --libs --cflags libavformat`
 AVUTIL=     `pkg-config --libs --cflags libavutil`
 FFMPEG=     $(AVCODEC) $(AVFORMAT) $(AVUTIL)
 
-CFLAGS = -Wall -ggdb
+CFLAGS = -Wall -O3
+#-ggdb
 
 BIN=scuep
 

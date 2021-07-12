@@ -11,7 +11,7 @@
 #include <threads.h>
 
 static char *device = "default";
-static snd_pcm_t *handle = NULL;
+static snd_pcm_t *pcm = NULL;
 
 static struct PlayerState *player = NULL;
 
@@ -46,27 +46,29 @@ snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
 
 static int alsa_loop(void*arg);
 
-int alsa_open( AVCodecParameters *params, struct PlayerState *_player )
+int alsa_open( struct PlayerState *_player )
 {
 	int err;
 	player = _player;
+	
+	alsa_close();
 
-	snd_pcm_format_t format = format_av2alsa( params->format );
+	snd_pcm_format_t format = format_av2alsa( player->format );
 
-	if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0){
+	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0){
         scuep_logf("Playback open error: %s\n", snd_strerror(err));
 		return -1;
     }
 	
 	silence = calloc( player->period, player->sizeof_frame );
 
-    if ((err = snd_pcm_set_params(handle,
+    if ((err = snd_pcm_set_params(pcm,
 		format,
 		SND_PCM_ACCESS_RW_INTERLEAVED,
-		params->channels,
-		params->sample_rate,
+		player->channels,
+		player->sample_rate,
 		1,     // soft resample
-		20000  // latency
+		50000  // latency
 		) ) < 0
 	){   
         scuep_logf("Playback open error: %s\n", snd_strerror(err));
@@ -84,59 +86,82 @@ int alsa_open( AVCodecParameters *params, struct PlayerState *_player )
 
 int alsa_close(void)
 {
-	player->sndsvr_close = NULL;
-	thread_run = 0;
-	thrd_join(thread, NULL);
-
+	if(thread_run){
+		player->sndsvr_close = NULL;
+		thread_run = 0;
+		thrd_join(thread, NULL);
+	}
 	return 0;
 }
 
 
 int alsa_loop(void*arg)
 {
-	printf("Thread OK\n");
+	printf("ALSA Thread open\n");
 	thread_run = 1;
 
 	snd_pcm_sframes_t  frames;
+	snd_pcm_prepare(pcm);
 	while(thread_run){
 		
-		printf( "played: %li bufhp: %li\n", 
+		uint32_t tail = player->tail;
+
+		printf( "played: %li bufhp: %li, h %i t %i\n", 
 			player->frames_played,
-			player->frames_decoded - player->frames_played 
+			player->frames_decoded - player->frames_played ,
+			player->head,
+			tail
 		);
 
-		if( player->frames_played + player->period > player->frames_decoded ){
-			snd_pcm_writei(handle,
+		if( player->frames_played + player->period > player->frames_decoded
+		||  player->pause 
+		){
+			snd_pcm_writei(pcm,
 				silence,
 				player->period
 			);
 			continue;
 		}
+		int total = player->period;
 
-		frames = snd_pcm_writei(handle,
-			player->data + player->tail * player->sizeof_frame,
-			player->period
-		);
-			
+		while( total > 0 ){
+			frames = snd_pcm_writei(pcm,
+				player->data + tail * player->sizeof_frame,
+				player->period
+			);
+			printf("PCM FRAMES %li %li\n", frames, total);
+			if(frames < 0) break;
+			total -= frames;
+		}
+		
+
 		if( frames < 0 ) {
 			// TODO Proper error handling !
-			printf("Alsa error? %s\n", snd_strerror(frames));
-			snd_pcm_prepare(handle);
+			printf("Alsa error %s\n", snd_strerror(frames));
+			//snd_pcm_prepare(pcm);
+			int ok = snd_pcm_recover(pcm, frames, 0);
+			if(!ok){
+				printf("Failed to recover. State undefined.\n");
+			}
 			continue;
 		}
 
-		player->tail += frames;
-		player->tail %= player->frames;
+		tail += frames;
+		tail %= player->frames;
+		player->tail = tail;
+
 		player->frames_played += frames;
+
 
 	}
 
 	// TODO Don't clip
 	
-	snd_pcm_drop(handle);
-	snd_pcm_close(handle);
-	handle = NULL;
+	snd_pcm_drop(pcm);
+	snd_pcm_close(pcm);
+	pcm = NULL;
 
+	printf("ALSA Thread close\n");
 	return 0;
 }
 
