@@ -3,6 +3,7 @@
 #include "util.h"
 
 #include "alsa.h"
+#include "log.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,20 +16,53 @@
 #include <libavformat/avformat.h>
 //#include <libswresample/swresample.h>
 
-// Function declarations
-int decoder_load(TrackId, float);
+/*
+ * Function declarations
+ */
+static int decoder_load(TrackId, float);
 static int player_write( AVFrame*, int, int );
-int decoder_loop(void*arg);
-void decoder_start(void);
-void decoder_stop(void);
-void decoder_free(void);
+static void player_write_blank_period();
+static int  decoder_loop(void*arg);
+static void decoder_start(void);
+static void decoder_stop(void);
+static void decoder_free(void);
 
+/*
+ * File globals
+ */
 static struct PlayerState *player = NULL;
+static struct PlayerInfo   info;
+
+struct PlayerState *_get_playerstate()
+{
+	return player;
+}
+
+const struct PlayerInfo *player_get_info(void)
+{
+	info.player = player; 
+
+	if(info.player == NULL) return &info;
+
+	info.paused   = player->pause;
+	info.track_id = player->tail.track_id;
+
+	info.progress = player_position_seconds();
+	info.duration = player_duration_seconds();
+
+	info.next_available = false;
+
+	if( player->head.done 
+	&&  player->head.total == player->tail.total )
+		info.next_available = true;
+
+	return &info;
+}
 
 void print_averr(int err){
 	char errstr[512];
 	av_make_error_string(errstr, 512, err);
-	printf("AVERR %i: %s\n", err, errstr);
+	scuep_logf("AVERR %i: %s\n", err, errstr);
 }
 
 /*
@@ -43,52 +77,93 @@ void print_averr(int err){
  */
 
 void player_init(void){
-	player = calloc(sizeof(struct PlayerState), 1);
+	if(!player) player = calloc(sizeof(struct PlayerState), 1);
 }
 
 int player_play(void){
+	if(!player) return 1;
 	player->pause = 0;
-	return -1;
+	return 0;
 }
 int player_pause(void){
+	if(!player) return 1;
 	player->pause = 1;
-	return -1;
+	return 0;
+}
+int player_toggle(void){
+	if(!player) return 1;
+	player->pause = !player->pause;
+	return 0;
 }
 
 
-int player_load(TrackId track_id){
-	player->track_id = track_id;
+int player_load(TrackId track_id)
+{
+	if(!player)
+		player_init();
 	decoder_load(track_id, 0.0);
 	decoder_start();
-	sleep_ms(1000);
 	if(!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
 
-int player_seek(float seconds){
-
-	printf("SEEK %f\n", seconds);
-
+int player_seek(float seconds)
+{
 	struct PlayerState *this = player;
+	if(!this) return -1;
 
-	decoder_load(this->track_id, seconds);
+	decoder_load(this->tail.track_id, seconds);
 	decoder_start();
-	if(!this->sndsvr_close) alsa_open( this );
+	if(!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
 
 
+int player_seek_relative(float seconds)
+{
+	struct PlayerState *this = player;
+	if(!this) return -1;
 
+	float seek = player_position_seconds() + seconds;
 
+	seek = MAX(0, seek);
 
+	player_seek(seek);
+	return 0;
+}
+
+float player_position_seconds(void)
+{
+	struct PlayerState *this = player;
+	if(!this) return 0.0f;
+	
+	float pos = this->tail.total   -
+	            this->tail.stream_changed  + 
+	            this->tail.stream_offset; 
+	return pos / (float) this->sample_rate;
+}
+
+float player_duration_seconds(void)
+{
+	struct PlayerState *this = player;
+	if(!this || !this->av.track) return 0.0f;
+	return this->av.track->length / 1000.0f;
+}
+
+TrackId player_current_track()
+{
+	if(!player) return 0;
+	return player->tail.track_id;
+}
 
 int player_stop(void)
 {
 	struct PlayerState *this = player;
+	if(!this) return 1;
 
 	if( this->sndsvr_close ) this->sndsvr_close();
 	decoder_free();
-	printf("Freeing player\n");
+	scuep_logf("Freeing player\n");
 
 	if( this->data ) {
 		free(this->data);
@@ -102,24 +177,26 @@ int player_stop(void)
 }
 
 
-int player_reconfig( AVCodecParameters *param )
+int player_reconfig( AVCodecParameters *param, bool flush )
 {
 	struct PlayerState *this = player;
 
 	this->period      = 1024;
-	this->frames      = this->period * 100;
+	this->frames      = this->period * 215;
+	//this->frames      = this->period * 10;
 	
 	if(	this->channels    != param->channels
 	||	this->sample_rate != param->sample_rate
 	||	this->format      != param->format
+	||  this->pause       == true 
 	){
-		printf("Hard reconfig\n");
+		scuep_logf("Hard reconfig\n");
 		if( this->sndsvr_close ) this->sndsvr_close();
-		if( this->data && 0) {
+		if( this->data ) {
 			free(this->data);
 			this->data = NULL;
 		}
-		// Hard reconfig!
+
 		this->channels    = param->channels;
 		this->sample_rate = param->sample_rate;
 		this->format      = param->format;
@@ -133,20 +210,20 @@ int player_reconfig( AVCodecParameters *param )
 			for( int i = 0; i < this->size; i++ )
 				this->data[i] = rand();
 		}
-		this->tail = 0;
-		this->head = 0;
-		this->frames_played = 0;
-		this->frames_decoded = 0;
+		this->head.ring = 0;
+		this->tail.ring = 0;
+		this->head.total = 0;
+		this->tail.total = 0;
 	} else {
-		if(1){ // cut buffer
-			this->frames_decoded = this->frames_played + this->period;
-			this->head = this->tail + this->period;
-			this->head %= this->frames;
+		if(flush){ // cut buffer
+			this->head.total = this->tail.total + this->period;
+			this->head.ring  = this->tail.ring  + this->period;
+			this->head.ring %= this->frames;
 		}
-		printf("Soft reconfig\n");
+		scuep_logf("Soft reconfig\n");
 	}
 
-	printf("Buffer time: %f seconds\n", this->frames / (float)param->sample_rate);
+	scuep_logf("Buffer time: %f seconds\n", this->frames / (float)param->sample_rate);
 
 	
 	return 0;
@@ -166,28 +243,36 @@ void decoder_free()
 	if(this->packet)    av_packet_free(&this->packet);
 	if(this->frame)     av_frame_free(&this->frame);
 
+	if(this->track)     this->track = track_free(this->track);
+
 	this->stream = NULL;
-	this->track = track_free(this->track);
 }
 
 int decoder_load(TrackId track_id, float seek)
 {
-	printf("SEEK %f\n", seek);
+	scuep_logf("Decoder load %i seek %f\n", track_id, seek);
 	struct DecoderState *this = &player->av;
 	int ret = 0;
 	
 	decoder_free();
 
+	player->head.track_id = track_id;
+	player->head.done     = 0;
+
 	this->track     = track_load(track_id);
+	if(!this->track){
+		scuep_logf("Failed to load track (database error?)\n");
+		return -1;
+	}
 	struct ScuepTrack *track = this->track;
 
 	if (avformat_open_input(&this->format, track->path, NULL, NULL) != 0) {
-		printf("Could not open file '%s'\n", track->path);
+		scuep_logf("Could not open file '%s'\n", track->path);
 		return -1;
 	}
 
 	if (avformat_find_stream_info(this->format, NULL) < 0) {
-		printf("Could not retrieve stream info from file '%s'\n", track->path);
+		scuep_logf("Could not retrieve stream info from file '%s'\n", track->path);
 		return -1;
     }
 
@@ -195,7 +280,7 @@ int decoder_load(TrackId track_id, float seek)
 	 * SELECT STREAM *
 	 *****************/
 
-	printf( "Track has %i stream(s)\n", this->format->nb_streams  );
+	scuep_logf( "Track has %i stream(s)\n", this->format->nb_streams  );
     int stream_index = -1;
     for (int i = 0; i < this->format->nb_streams; i++) 
 	{
@@ -203,11 +288,11 @@ int decoder_load(TrackId track_id, float seek)
 
 		const char *stream_type = av_get_media_type_string( type ); // Leak??
 
-		printf( "Stream %i type: %s\n", i, stream_type);
+		scuep_logf( "Stream %i type: %s\n", i, stream_type);
         if (type == AVMEDIA_TYPE_AUDIO) stream_index = i;
     }
 	if(stream_index== -1){
-		printf( "No suitable stream!\n");
+		scuep_logf( "No suitable stream!\n");
 		return -1;
 	}
 
@@ -221,10 +306,23 @@ int decoder_load(TrackId track_id, float seek)
 
 	int sample_rate = param->sample_rate;
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
+
+	if(track->length < 1) {
+		scuep_logf("Recalculating duration...\n");
+		int64_t recalc_dur =  av_rescale_q(
+			this->stream->duration,
+			this->stream->time_base,
+			sample_scale
+		);
+		this->track->length = recalc_dur / (sample_rate) * 1000.0f - track->start;
+	}
+
 	int __seek   = seek * sample_rate;
 	int __start  = track->start   * (sample_rate/1000.0f) + __seek;
 	int __length = track->length  * (sample_rate/1000.0f) - __seek;
-	printf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
+	scuep_logf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
+	
+
 
 	int64_t seek_to = av_rescale_q(
 			__start, 
@@ -232,6 +330,8 @@ int decoder_load(TrackId track_id, float seek)
 			this->stream->time_base
 		);
 	
+	player->head.stream_offset = __seek;
+
 	ret = av_seek_frame( this->format, stream_index, seek_to, AVSEEK_FLAG_BACKWARD );
 	if(ret<0) goto error;
 
@@ -249,37 +349,37 @@ int decoder_load(TrackId track_id, float seek)
 
 
 	int sizeof_sample = av_get_bytes_per_sample(param->format);
-	int interleaved   = av_sample_fmt_is_planar(param->format);
 	int channels    = param->channels;
 	if(channels != 2) {
-		printf("Channel count of %i is not yet supported", channels);
+		scuep_logf("Channel count of %i is not yet supported", channels);
 		goto error;
 	}
 	
 	{ // Print info about codecs and stuff
 		const char *format_str = av_get_sample_fmt_name(param->format);
-		printf( "%ihz %ic %s (%ib) %s\n", 
+		scuep_logf( "%ihz %ic %s (%ib) %s\n", 
 				param->sample_rate, 
 				channels,
 				format_str, 
 				sizeof_sample, 
 				this->codec->long_name 
 			);
-		printf("Timebase: %i / %i\n", this->stream->time_base.den, this->stream->time_base.num);
+		scuep_logf("Timebase: %i / %i\n", this->stream->time_base.den, this->stream->time_base.num);
 	}
 	
 	/**************
 	 * OPEN AUDIO *
 	 **************/
 
-	printf("Open audio\n");
-	player_reconfig( param );
-	printf("Reconfig ok\n");
+	scuep_logf("Open audio\n");
+	player_reconfig( param, true );
+	scuep_logf("Reconfig ok\n");
 
+	player->head.stream_changed  = player->head.total;
 
 	return 0;
 error:
-	printf("Error happened!\n");
+	scuep_logf("Error happened!\n");
 	print_averr(ret);
 	return -1;
 }
@@ -295,7 +395,7 @@ void decoder_stop()
 {
 	struct DecoderState *this  = &player->av;
 	if( this->thread_run ){
-		printf("Stopping decoder thread\n");
+		scuep_logf("Stopping decoder thread\n");
 		this->thread_run = 0;
 		thrd_join(this->thread, NULL);
 	}
@@ -303,12 +403,12 @@ void decoder_stop()
 
 int decoder_loop(void*arg)
 {
-	printf("Begin decode thread!\n");
 	struct DecoderState *this  = &player->av;
+	this->thread_run = 1;
 	struct ScuepTrack   *track = this->track;
 	int ret = 0;
-
-	this->thread_run = 1;
+	
+	scuep_logf("Decode thread started\n");
 
 	AVCodecParameters *param = this->stream->codecpar; 
 	int sample_rate = param->sample_rate;
@@ -317,6 +417,7 @@ int decoder_loop(void*arg)
 	int __length = track->length  * (sample_rate*0.001) ;
 
 	while(this->thread_run){
+		av_packet_unref(this->packet);
 		ret = av_read_frame(this->format, this->packet);
 		if(ret < 0) goto error;
 
@@ -324,7 +425,7 @@ int decoder_loop(void*arg)
 		
 		ret  = avcodec_send_packet( this->codec_ctx, this->packet );
 		if( ret < 0 ){
-			printf("Send broke! %i\n", ret);
+			scuep_logf("Send broke! %i\n", ret);
 			print_averr(ret);
 			break;
 		}
@@ -342,15 +443,18 @@ int decoder_loop(void*arg)
 
 			int64_t samples = this->frame->nb_samples;
 			
-			if(sample_pos > __start+__length) goto finish;
-			if(!this->frame->nb_samples) continue;
+			if(sample_pos > __start+__length) {
+				player->head.done = true;
+				goto finish;
+			}
+			if(!samples)        continue;
 
 			int cut_front = MAX( __start - sample_pos, 0);
 			int cut_back  = MAX( (sample_pos+samples)-(__start+__length), 0);
 			int total     = samples-cut_front-cut_back;
 
 			if(cut_front || cut_back){
-				printf("%li, Frame %i+%i front %i, back %i\n", 
+				scuep_logf("%li, Frame %i+%i front %i, back %i\n", 
 						sample_pos,
 						this->codec_ctx->frame_number, 
 						this->frame->nb_samples, 
@@ -361,13 +465,45 @@ int decoder_loop(void*arg)
 			player_write(this->frame, cut_front, total);
 		}
 	}
+
 finish:	
-	printf("Decoder quit!\n");
+	player_write_blank_period();
+	av_packet_unref(this->packet);
+	scuep_logf("Decoder quit!\n");
+	this->thread_run = 0;
 	return 0;
 error:
-	printf("Error happened!\n");
+	av_packet_unref(this->packet);
+	scuep_logf("Error happened!\n");
+	this->thread_run = 0;
 	print_averr(ret);
 	return -1;
+}
+
+void player_write_blank_period()
+{
+	struct PlayerState *this = player;
+
+	uint64_t head = this->head.ring;
+	uint64_t next = (head / this->period ) * this->period;
+	
+	if(next == head) return;	
+	
+	next += this->period;
+	uint64_t total = next - head;
+
+	memset(
+		this->data + (head * this->sizeof_frame),
+		0,
+		total * this->sizeof_frame
+	);
+
+	head += total;
+	head %= this->frames;
+	this->head.ring = head;
+	this->head.total += total;
+
+	return;
 }
 
 int player_write( 
@@ -382,16 +518,16 @@ int player_write(
 	int left = total;
 	int packet_written = cut_front;
 
-	uint32_t head = this->head;
+	uint32_t head = this->head.ring;
 
-	printf("DECODER_WRITE %i\n", head);
+	scuep_logf("DECODER_WRITE %i\n", head);
 
 	// Loop until the whole packet has been written out
 	while( left != 0 && this->av.thread_run ){
 
 		int available = this->frames - 
-			           (this->frames_decoded - 
-		                this->frames_played);
+			           (this->head.total - 
+		                this->tail.total);
 		
 		available = MIN( available, this->frames - head );
 		available = MIN( available, left );
@@ -423,8 +559,8 @@ int player_write(
 
 		head += available;
 		head %= this->frames;
-		this->head = head;
-		this->frames_decoded += available;
+		this->head.ring = head;
+		this->head.total += available;
 
 		packet_written += available;
 		left -= available;

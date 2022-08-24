@@ -16,8 +16,6 @@ Both of those goals have been met as of 10/05/21.
 
 ## What doesn't
 - Interface is largely unimplemented
-- Playback control (seek, pause, etc)
-
 
 ## (Non-)Portability notes
 #### wchar_t

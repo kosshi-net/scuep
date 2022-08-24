@@ -2,6 +2,8 @@
 
 #include "frontend.h"
 #include "database.h"
+#include "player.h"
+
 #include "util.h"
 
 #include <stdlib.h>
@@ -27,7 +29,8 @@
 
 #define ELEMENT_PROGRESS (1<<1)
 #define ELEMENT_CAROUSEL (1<<2) 
-#define ELEMENT_PROMPT   (1<<2) 
+#define ELEMENT_PROMPT   (1<<3) 
+#define ELEMENT_DEBUG    (1<<4) 
 
 #define ELEMENT_PROPERTIES (1<<4) 
 
@@ -44,6 +47,7 @@ void queue_redraw(int elem){
 
 static void draw_carousel();
 static void draw_progress();
+static void draw_debug();
 static void input();
 
 static int term_cols = 0;
@@ -113,9 +117,17 @@ int frontend_tick(void)
 		term_rows = _rows;
 	}
 
+	static int progress_last = -1;
+	int progress_now = floorf(player_position_seconds());
+	if( progress_last != progress_now ){
+		queue_redraw(ELEMENT_PROGRESS);
+		progress_last = progress_now;
+	}
 
 	if( elements_dirty & ELEMENT_CLEAR    ) clear();
 	if( elements_dirty & ELEMENT_CAROUSEL ) draw_carousel();
+	if( elements_dirty & ELEMENT_PROGRESS ) draw_progress();
+	if( true                              ) draw_debug();
 
 	if(elements_dirty) refresh();
 	elements_dirty = 0;
@@ -133,6 +145,41 @@ void input_default( int key )
 {
 	switch( key ){
 		
+		case '\n':
+		case KEY_ENTER:
+			player_load( playlist_track( 1 + cursor_pos ) );
+			player_play();
+			break;
+
+		case KEY_RIGHT:
+			player_seek_relative( 5.0);
+			break;
+		case KEY_LEFT:
+			player_seek_relative(-5.0);
+			break;
+
+		case 'z':
+			// previous
+			break;
+		case 'b':
+			// next
+			break;
+		
+		case 'x':
+			player_seek(0);
+			player_play();
+			break;
+
+		case 'v':
+			player_stop();
+			break;
+
+
+		case 'c':
+		case ' ':
+			player_toggle();
+			break;
+
 		case 'k':
 		case KEY_UP:
 			cursor_pos -= MAX( 1, input_repeat );
@@ -208,6 +255,8 @@ static uint32_t rcount = 0;
 void draw_carousel()
 {
 	mvprintw(0, 5, "%i, %lu, playlist: %i / %i", rcount++, time_ms(), cursor_pos , playlist_items);
+
+
 	static wchar_t wctext[1024] = {0};
 
 	int items = playlist_count();
@@ -251,6 +300,56 @@ void draw_carousel()
 	}
 
 }
+
+void draw_debug()
+{
+	struct PlayerState *player = _get_playerstate();
+
+	move(1,0);
+	clrtoeol();
+
+	if(!player){
+		mvprintw(1,0, "%s", "Player uninitialized" );
+		
+	} else {
+
+		mvprintw(1,0, 
+			" paused: %i"
+			" done: %i"
+			" decoder: %i"
+			" sndsvr %i"
+			" buffer: %i"
+			,player->pause 
+			,player->head.done 
+			,player->av.thread_run 
+			,!!player->sndsvr_close
+			,player->head.total - player->tail.total
+
+		);
+
+
+
+	}
+	
+
+
+}
+
+void draw_progress()
+{
+	float fprogress = player_position_seconds();
+	int progress = fprogress;
+	mvprintw( 0, 50, "pos: %f", fprogress );
+
+	int duration = player_duration_seconds();
+
+	mvprintw( 0, 70, "%i:%02i / %i:%02i        ", 
+		progress/60,
+		progress%60,
+		duration/60,
+		duration%60
+	);
+};
 
 
 

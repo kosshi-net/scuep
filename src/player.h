@@ -26,6 +26,7 @@ struct DecoderState {
 };
 
 
+
 struct PlayerState {
 	
 	_Atomic bool pause;
@@ -45,19 +46,26 @@ struct PlayerState {
 	// not an issue, eg sample and cache the values. Make sure to do full 
 	// writes. 
 	
-	// Positions in ring buffer
-	_Atomic uint32_t head; // decoder
-	_Atomic uint32_t tail; // sndsvr
+	struct {
+		_Atomic uint64_t ring;          // Position in ring buffer
+		_Atomic uint64_t total;         // Total frames decoded
+		_Atomic bool     done;
 
-	// Totals
-	_Atomic	uint64_t frames_played; // sndsvr
-	_Atomic	uint64_t frames_decoded; // decoder
+		_Atomic TrackId  track_id;
+		_Atomic uint64_t stream_changed; 
+		_Atomic uint64_t stream_offset;
 
-	uint64_t position_since; 
-	uint64_t position_offset; 
+	} head;
 
-	TrackId track_id;
-	TrackId track_id_new;
+	struct {
+		_Atomic uint64_t ring;    
+		_Atomic uint64_t total;          // Total frames played
+		_Atomic bool     done;
+
+		_Atomic TrackId  track_id;
+		_Atomic uint64_t stream_changed; 
+		_Atomic uint64_t stream_offset;
+	} tail;
 
 	enum AVSampleFormat format;
 
@@ -68,21 +76,50 @@ struct PlayerState {
 
 };
 
-
+// Not necessary to call. 
 void player_init();
 
-int player_load(TrackId);
-
-// Absolute seek
 int      player_seek(float);
-uint64_t player_position(void);
+int      player_seek_relative(float);
 
+float    player_position_seconds(void);
+float    player_duration_seconds(void);
+
+int player_toggle();
 int player_play();
-
 int player_pause();
-
 int player_stop();
 
+// PlayerInfo is the public state. 
+struct PlayerInfo {
+	// When unitialized (stopped), player is NULL. All values are invalid.
+	// You may access the struct at your own risk for additional information.
+	struct PlayerState *player;          
 
+	// Pause state
+	bool   	            paused;          
+
+	// Set to true when decoder or sndsvr goes idle. 
+	// player_load_next() clears this flag regardless of success when only
+	// decoder is idle. 
+	bool                next_available;  
+	
+	// Currently playing track. Decoder may be decoding a different one. 
+	TrackId             track_id;
+
+	// In seconds
+	float               duration;
+	float               progress;
+	
+};
+
+/* Do not free or edit returned struct. Not thread safe. */
+const struct PlayerInfo *player_get_info();
+
+int player_load(TrackId);
+int player_load_next(TrackId);
+
+// Debugging purposes
+struct PlayerState *_get_playerstate();
 
 #endif

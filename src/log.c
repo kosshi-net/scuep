@@ -1,37 +1,30 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <syslog.h>
 
 #include "log.h"
 
-// This whole file is a bit redundant
+static bool enable_logging = false;
 
-int enable_logging = 0;
-
-void scuep_log_start(){
+void scuep_log_start( char *path ){
 	if(enable_logging) return;
-	enable_logging = 1;
-	
-	openlog( "scuep", 0, LOG_USER );
-	syslog(LOG_INFO, "Logger started");
+	enable_logging = true;
 }
 
 void scuep_log_stop(){
 	if(!enable_logging) return;
-	enable_logging = 0;
-
-	syslog(LOG_INFO, "Logger stopped");
-	closelog();
+	enable_logging = false;
 }
 
-void scuep_logf(char *format, ...){
+void scuep_logf(const char *format, ...){
 	if(!enable_logging) return;
 
 	va_list args;
 	va_start (args, format);
-	vsyslog(LOG_INFO, format, args);
+	vfprintf(stderr, format, args);
 	va_end (args);
+
 }
 
 

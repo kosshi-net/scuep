@@ -40,6 +40,8 @@ static void  load_playlist(char *playlist);
 
 static bool ro = 0;
 
+
+
 void scuep_exit(const char *error);
 
 
@@ -91,14 +93,14 @@ enum Flag parse_flag( char* str )
 #define HELP_MESSAGE \
 "SCUEP - Simple CUE Player\n\n" \
 "The player is in an early development state.\n" \
-"Please visit https://github.com/kosshishub/scuep for updates and additional\n" \
+"Please visit https://github.com/kosshi-net/scuep for updates and additional\n" \
 "help and usage examples.\n" \
 "--help\n" \
 "    Display help\n" \
 "--version\n" \
 "    Print version\n" \
 "--debug\n" \
-"    Enable logging with Syslog\n" \
+"    Enable logging \n" \
 "--ro\n" \
 "    Don't overwrite playlist saved in .config\n" \
 "-i, -\n" \
@@ -125,8 +127,8 @@ int build_config_paths(){
 		mkdir( path_config_folder, 0700 );
 	}
 
-	printf("%s\n", path_config_folder);
-	printf("%s\n", path_database);
+	scuep_logf("%s\n", path_config_folder);
+	scuep_logf("%s\n", path_database);
 
 	return 0;
 }
@@ -139,7 +141,6 @@ int main(int argc, char **argv)
 	if( build_config_paths() ) return -1;
 
 	char *input_file = NULL;
-	
 	for(int i = 1; i < argc; i++){
 		char *arg = argv[i];
 		enum Flag flag = parse_flag(arg);
@@ -168,7 +169,7 @@ int main(int argc, char **argv)
 				break;
 			case flag_reset:
 				unlink(path_database);
-				printf("Database reset\n");
+				scuep_logf("Database reset\n");
 				break;
 			default:
 				// Assume its a file
@@ -181,38 +182,26 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if( !input_file ){
-		scuep_exit("No input file. Required for this development version");
-	}
+	//if( !input_file ){
+	//	scuep_exit("No input file. Required for this development version");
+	//}
 	
 	if (db_initialize( path_database )) {
 		fprintf(stderr, "Database error\n");
 		return 1;
-	}else{
-		printf("Database OK\n");
+	}
+	
+	if( input_file ){
+		playlist_clear();
+		load_playlist( input_file );
+		transaction_end();
+
+		free(input_file);
+		input_file = NULL;
 	}
 
-	playlist_clear();
-	load_playlist( input_file );
-	transaction_end();
-
-	player_init();
-	player_load( playlist_track(2) );
-	sleep_ms(1000);
-	sleep_ms(1000);
-	printf("\n\n\n\n\n\n\n");
-
-	player_load( playlist_track(2) );
-	sleep_ms(1000);
-	player_stop();
-	sleep_ms(1000);
-	printf("\n\n\n\n\n\n\n");
-
-
-
-
-	//frontend_initialize();
-	//frontend_terminate();
+	frontend_initialize();
+	frontend_terminate();
 
 	db_terminate();
 }
@@ -263,10 +252,10 @@ void load_playlist(char *playlist)
 		// if true, add id and continue
 		track_id = track_by_uri(uri);
 		
-		printf("track_id %i\n", track_id);
+		scuep_logf("track_id %i\n", track_id);
 
 		if( track_id > -1){
-			printf("track_id found %i, skip \n", track_id);
+			scuep_logf("track_id found %i, skip \n", track_id);
 			playlist_push(track_id);
 			goto skip;
 		}
@@ -316,21 +305,6 @@ void load_playlist(char *playlist)
 			track.dirname    = scuep_dirname(path);
 			printf("BASENAME %s\n", track.basename);
 
-			if(track.length == 0) {
-				// Length of the last chapter cant be parsed from the cue sheet 
-				// Use taglib to get the length of the whole file
-				const char *cue_filename = track_get_filename(cue_track);
-				char cue_path[1024*4];
-				strcpy( cue_path, track.path );
-				strcpy( scuep_basename(cue_path), cue_filename );
-
-				tl_file = taglib_file_new( cue_path );
-				const TagLib_AudioProperties *tl_prop = taglib_file_audioproperties( tl_file ); 
-				track.length = 
-					  taglib_audioproperties_length( tl_prop ) 
-					* 1000 
-					- track.start;
-			}
 		}
 		else{ // Misc file, use taglib
 			
@@ -367,8 +341,7 @@ void load_playlist(char *playlist)
 
 		// if metadata failed to load, use filename instead
 		if( !track.title[0] )  track.title = scuep_basename(uri);
-		/*
-		printf( "%s // %s // %s // %i - %is, #%i\n", \
+		scuep_logf( "%s // %s // %s // %i - %is, #%i\n", \
 			track.title, 
 			track.artist, 
 			track.album, 
@@ -377,7 +350,6 @@ void load_playlist(char *playlist)
 			track.chapter
 		);
 		printf( "uri: %s\n", track.uri);
-		*/
 		// TODO errorcheck!
 		track_store(&track);
 		track_id = track_by_uri(uri);
@@ -394,7 +366,6 @@ void load_playlist(char *playlist)
 		tail = ++head;
 	}
 finish:
-	printf("Transaction end\n");
 	transaction_end();
 	return;
 }
