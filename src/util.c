@@ -30,8 +30,8 @@
 
 char *scuep_basename(const char*c){
 	const char *last = c;
-	while(*++c){
-		if( *c == '/' ) last = c;
+	while (*++c){
+		if (*c == '/') last = c;
 	}
 	return (char*)(last+1);
 }
@@ -53,32 +53,32 @@ char *scuep_strcat( char *dest, char *src ){
 	size_t dest_len = strlen(dest);
 	size_t src_len  = strlen(src);
 
-	char *ret = realloc ( dest, dest_len+src_len+1 );
+	char *ret = realloc(dest, dest_len+src_len+1);
 
 	memcpy( ret+dest_len, src, src_len+1 );
 
 	return ret;
 }
 
-// Case insensitive widechar substring search
-// Not efficient but works
+/* Case insensitive widechar substring search
+ * Not efficient but works */
 wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
 
-	if(!haystack || !*haystack) return 0;
+	if (!haystack || !*haystack) return 0;
 
 	size_t haystack_len = wcslen(haystack);
 	size_t needle_len = wcslen(haystack);
 
-	wchar_t *haystack_case = calloc( haystack_len+1, sizeof(wchar_t) );
-	wchar_t *needle_case   = calloc( needle_len+1,   sizeof(wchar_t) );
+	wchar_t *haystack_case = calloc(haystack_len+1, sizeof(wchar_t));
+	wchar_t *needle_case   = calloc(needle_len+1,   sizeof(wchar_t));
 
-	for( int i = 0; i < haystack_len; i++ )
+	for (int i = 0; i < haystack_len; i++)
 		haystack_case[i] = towupper(haystack[i]);
 
-	for( int i = 0; i < needle_len; i++ )
+	for (int i = 0; i < needle_len; i++)
 		needle_case[i] = towupper(needle[i]);
 
-	wchar_t *p = wcsstr( haystack_case, needle_case );
+	wchar_t *p = wcsstr(haystack_case, needle_case);
 	
 	free(haystack_case);
 	free(needle_case);
@@ -114,24 +114,21 @@ int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width
 	return 0;
 }
  
-// Returns true when str starts with pre
+/* Returns true when str starts with pre */
 bool prefix(const char *pre, const char *str){
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
-
 /*
  * FILE AND IO UTILITIES
- * */
-
-
+ */
 
 char *read_stdin(){
 	size_t buffer_size = 1024*4; 
 	size_t buffer_index = 0;
 	char *buffer = malloc(buffer_size);
 	int c = 0;
-	while( (c = getchar()) != EOF ) {
+	while((c = getchar()) != EOF) {
 		buffer[buffer_index++] = c;
 		if(buffer_index == buffer_size){
 			buffer_size*=2;

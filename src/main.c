@@ -40,15 +40,10 @@ static void  load_playlist(char *playlist);
 
 static bool ro = 0;
 
-
-
-void scuep_exit(const char *error);
-
-
 void scuep_exit( const char *error)
 {
 	// Do clean up
-	if(error){
+	if (error) {
 		fprintf(stderr, "%s\n", error);
 		exit(1);
 	}
@@ -110,20 +105,20 @@ enum Flag parse_flag( char* str )
 int build_config_paths(){
 	char *cfgroot = getenv("XDG_CONFIG_HOME");
 
-	if( !cfgroot ){
+	if (!cfgroot) {
 		char *home = getenv("HOME");
 		asprintf( &cfgroot, "%s/.config", home );
 	}
 
-	asprintf(&path_config_folder, "%s/scuep-dev", cfgroot );
-	asprintf(&path_database, "%s/scuep.db", path_config_folder );
+	asprintf(&path_config_folder, "%s/scuep-dev", cfgroot);
+	asprintf(&path_database, "%s/scuep.db", path_config_folder);
 
-	if( access( cfgroot, W_OK ) ){
+	if (access(cfgroot, W_OK)) {
 		fprintf(stderr, "%s is not a valid config path\n", cfgroot);
 		return -1;
 	}
 	
-	if( access( path_config_folder, W_OK ) ){
+	if (access(path_config_folder, W_OK)) {
 		mkdir( path_config_folder, 0700 );
 	}
 
@@ -138,14 +133,14 @@ int main(int argc, char **argv)
 {
 	setlocale(LC_ALL,"");
 
-	if( build_config_paths() ) return -1;
+	if (build_config_paths()) return -1;
 
 	char *input_file = NULL;
-	for(int i = 1; i < argc; i++){
+	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		enum Flag flag = parse_flag(arg);
 		
-		switch(flag){
+		switch (flag) {
 			case flag_help:
 				printf("%s", HELP_MESSAGE);
 				scuep_exit(NULL);
@@ -174,7 +169,7 @@ int main(int argc, char **argv)
 			default:
 				// Assume its a file
 				input_file = read_file(arg);
-				if(!input_file){
+				if (!input_file){
 					scuep_exit("Invalid option or file\nscuep --help");
 				}
 
@@ -182,16 +177,13 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//if( !input_file ){
-	//	scuep_exit("No input file. Required for this development version");
-	//}
 	
-	if (db_initialize( path_database )) {
+	if (db_initialize(path_database)) {
 		fprintf(stderr, "Database error\n");
 		return 1;
 	}
 	
-	if( input_file ){
+	if (input_file) {
 		playlist_clear();
 		load_playlist( input_file );
 		transaction_end();
@@ -213,13 +205,14 @@ int main(int argc, char **argv)
 #define LOAD_PLAYLIST_INCLUDE 1
 #ifdef LOAD_PLAYLIST_INCLUDE
 
-// TODO: Use strdup instead of const disgarding, move it to import.c and split 
-// it up more, make it return on error instead of calling exit()
+/*
+ * TODO: 
+ * Use strdup instead of const disgarding
+ * Move to import.c and split  it up 
+ * Make it return on error instead of calling exit() 
+ */
 void load_playlist(char *playlist)
 {
-	//int track_count = 1;
-	//do{ if(*c=='\n') track_count++; } while(*++c);
-	
 	transaction_begin();
 
 	char clip[4096];
@@ -248,8 +241,10 @@ void load_playlist(char *playlist)
 		strcpy(clip, tail);
 		const char *uri = tail;
 
-		// Check if URL exists in cache database
-		// if true, add id and continue
+		/* 
+		 * Check if URL exists in cache database
+		 * if true, add id and continue
+		 */
 		track_id = track_by_uri(uri);
 		
 		scuep_logf("track_id %i\n", track_id);
@@ -263,7 +258,7 @@ void load_playlist(char *playlist)
 
 		struct ScuepTrack track;
 		memset(&track, 0, sizeof(struct ScuepTrack));
-		track.uri  = uri;
+		track.uri = uri;
 
 		if (strncmp(&uri[0], "cue://", 6)  == 0) {
 

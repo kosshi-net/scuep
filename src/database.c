@@ -38,14 +38,14 @@ int	           stmt_list_count = 0;
  */
 int prepare (sqlite3_stmt **stmt, const char *sql)
 {
-	if( *stmt != NULL ){
+	if (*stmt != NULL) {
 		sqlite3_reset(*stmt);
 		return SQLITE_OK;
 	}
 
 	int rc = sqlite3_prepare_v2(db, sql, -1, stmt, 0);
 
-	if(rc == SQLITE_OK) {
+	if (rc == SQLITE_OK) {
 		stmt_list[stmt_list_count++] = stmt;
 		scuep_logf("Prepared %s\n", sql);
 		return rc;
@@ -66,7 +66,7 @@ int db_initialize( char* _path_database )
 {
 	path_database = _path_database;
 
-	int rc = sqlite3_open( path_database, &db );
+	int rc = sqlite3_open(path_database, &db);
 	if (rc != SQLITE_OK) {
 		scuep_logf("Cannot open %s\n", path_database);
 		return 1;
@@ -101,7 +101,7 @@ int transaction_end(){
 
 int db_stmt_finalize_all(){
 
-	for( int i = 0; i < stmt_list_count; i++ ){
+	for (int i = 0; i < stmt_list_count; i++) {
 		sqlite3_finalize( *stmt_list[i] );
 		*stmt_list[i] = NULL;
 	}
@@ -112,11 +112,11 @@ int db_stmt_finalize_all(){
 }
 
 
-// Check if database is valid and version is OK
+/* Check if database is valid and version is OK */
 int db_check()
 {
 	int ver = db_intvar_load("version");
-	return ( ver != SCUEP_FORMAT_VERSION );
+	return (ver != SCUEP_FORMAT_VERSION);
 };
 
 int db_reset()
@@ -131,7 +131,7 @@ int db_reset()
 		return 1;
 	}
 
-	sql_schema_sql[sql_schema_sql_len-1]=0;
+	sql_schema_sql[sql_schema_sql_len-1] = 0;
 
 	char *errmsg = NULL;
 	rc = sqlite3_exec( 
@@ -170,7 +170,7 @@ int db_prepare()
 
 	// TEST CODE HERE
 	
-	if(0) goto error;
+	if (0) goto error;
 
 	return 0;
 	
@@ -186,7 +186,7 @@ int db_intvar_load (const char *key)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare( &stmt, 
+	rc = prepare(&stmt, 
 		"SELECT value FROM variables WHERE key=?1;"
 	);
 	if (rc != SQLITE_OK) goto error;
@@ -208,7 +208,7 @@ int db_intvar_store (const char *key, int val)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare( &stmt, 
+	rc = prepare(&stmt, 
 		"REPLACE INTO variables (key, value) VALUES (?1, ?2);"
 	);
 	if(rc != SQLITE_OK) goto error;
@@ -267,18 +267,13 @@ TrackId playlist_track(int row)
 }
 
 
-
-
-
-
-
 int playlist_push( TrackId id )
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare( &stmt, "INSERT INTO playlist(track_id) VALUES (?1)");
+	rc = prepare(&stmt, "INSERT INTO playlist(track_id) VALUES (?1)");
 	
-	rc = sqlite3_bind_int( stmt, 1, id );
+	rc = sqlite3_bind_int(stmt, 1, id);
 
 	rc = sqlite3_step(stmt);
 
@@ -287,7 +282,6 @@ int playlist_push( TrackId id )
 	return 0;
 	error:
 	return -1;
-
 }
 
 
@@ -297,15 +291,15 @@ TrackId track_by_uri( const char* uri )
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare( &stmt, 
+	rc = prepare(&stmt, 
 		"SELECT id FROM tracks WHERE uri=?1"
 	);
 	rc = sqlite3_bind_text(stmt, 1, uri, -1, NULL );
 
-	if(rc != SQLITE_OK) goto error;
+	if (rc != SQLITE_OK) goto error;
 
 	rc=sqlite3_step(stmt);
-	if(rc != SQLITE_ROW) goto error;
+	if (rc != SQLITE_ROW) goto error;
 
 	return sqlite3_column_int(stmt, 0);
 
@@ -365,7 +359,7 @@ struct ScuepTrack *track_load ( int id )
 
 	struct ScuepTrack *track = NULL;
 
-	prepare( &stmt,
+	prepare(&stmt,
 		"SELECT  "
 		"uri, "
 		"title, "
@@ -378,16 +372,14 @@ struct ScuepTrack *track_load ( int id )
 		"basename "
 		" FROM tracks WHERE id=?1;"
 	);
-	prepare( &stmt_artist, "SELECT (name) FROM artists WHERE id=(?1)" );
-	prepare( &stmt_album,  "SELECT (name) FROM albums  WHERE id=(?1)" );
+	prepare(&stmt_artist, "SELECT (name) FROM artists WHERE id=(?1)");
+	prepare(&stmt_album,  "SELECT (name) FROM albums  WHERE id=(?1)");
 
 	rc=sqlite3_bind_int(stmt, 1, id);
 	if (rc != SQLITE_OK) goto error;
 
-
 	rc=sqlite3_step(stmt);
 	if (rc != SQLITE_ROW) goto error;
-	
 
 	track = calloc(1,sizeof(struct ScuepTrack));
 

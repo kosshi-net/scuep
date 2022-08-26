@@ -19,7 +19,7 @@ static struct PlayerState *player = NULL;
 static thrd_t thread;
 static int    thread_run = 0;
 
-// A period of silence
+/* A period of silence */
 static uint8_t *silence = NULL; 
 
 snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
@@ -46,14 +46,14 @@ snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
 
 static int alsa_loop(void*arg);
 
-int alsa_open( struct PlayerState *_player )
+int alsa_open(struct PlayerState *_player)
 {
 	int err;
 	player = _player;
 	
 	alsa_close();
 	
-	silence = calloc( player->period, player->sizeof_frame );
+	silence = calloc(player->period, player->sizeof_frame);
 	snd_pcm_format_t format = format_av2alsa( player->format );
 
 	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0){
@@ -66,8 +66,8 @@ int alsa_open( struct PlayerState *_player )
 		SND_PCM_ACCESS_RW_INTERLEAVED,
 		player->channels,
 		player->sample_rate,
-		1,     // soft resample
-		50000  // latency
+		/* soft resample */ 1,
+		/* latency       */ 50000
 		) ) < 0
 	){   
 		scuep_logf("Playback open error: %s\n", snd_strerror(err));
@@ -84,12 +84,12 @@ int alsa_open( struct PlayerState *_player )
 
 int alsa_close(void)
 {
-	if(thread_run){
+	if (thread_run){
 		player->sndsvr_close = NULL;
 		thread_run = 0;
 		thrd_join(thread, NULL);
 	}
-	if(silence)
+	if (silence)
 		free(silence);
 	silence = NULL;
 
@@ -106,10 +106,10 @@ int alsa_loop(void*arg)
 	player->tail.stream_changed = player->head.stream_changed;
 	player->tail.stream_offset  = player->head.stream_offset;
 
-	snd_pcm_sframes_t  frames = 0;
+	snd_pcm_sframes_t frames = 0;
 	snd_pcm_prepare(pcm);
 
-	while(thread_run){
+	while (thread_run){
 		
 		if( player->tail.stream_changed != player->head.stream_changed 
 		&&  player->tail.total          >= player->head.stream_changed
@@ -124,7 +124,7 @@ int alsa_loop(void*arg)
 
 		int total = MIN(player->head.total - player->tail.total, player->period);
 
-		if( total < player->period
+		if (total < player->period
 		||  player->pause 
 		){
 			snd_pcm_writei(pcm,
@@ -135,7 +135,7 @@ int alsa_loop(void*arg)
 		}
 
 
-		while( total > 0 ){
+		while (total > 0) {
 			frames = snd_pcm_writei(pcm,
 				player->data + tail * player->sizeof_frame,
 				total
@@ -146,7 +146,7 @@ int alsa_loop(void*arg)
 		}
 		
 
-		if( frames < 0 ) {
+		if (frames < 0) {
 			// TODO Proper error handling !
 			scuep_logf("Alsa error %s\n", snd_strerror(frames));
 			//snd_pcm_prepare(pcm);

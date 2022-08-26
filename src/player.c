@@ -185,7 +185,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 	this->frames      = this->period * 215;
 	//this->frames      = this->period * 10;
 	
-	if(	this->channels    != param->channels
+	if (this->channels    != param->channels
 	||	this->sample_rate != param->sample_rate
 	||	this->format      != param->format
 	||  this->pause       == true 
@@ -394,7 +394,7 @@ void decoder_start()
 void decoder_stop()
 {
 	struct DecoderState *this  = &player->av;
-	if( this->thread_run ){
+	if (this->thread_run) {
 		scuep_logf("Stopping decoder thread\n");
 		this->thread_run = 0;
 		thrd_join(this->thread, NULL);
@@ -522,15 +522,15 @@ int player_write(
 
 	scuep_logf("DECODER_WRITE %i\n", head);
 
-	// Loop until the whole packet has been written out
+	/* Loop until the whole packet has been written out */
 	while( left != 0 && this->av.thread_run ){
 
 		int available = this->frames - 
 			           (this->head.total - 
 		                this->tail.total);
 		
-		available = MIN( available, this->frames - head );
-		available = MIN( available, left );
+		available = MIN(available, this->frames - head);
+		available = MIN(available, left);
 
 
 		if(available == 0){
@@ -547,9 +547,9 @@ int player_write(
 		} else {
 			// Nobody should use MP3 anyway
 			int i = head * this->sizeof_frame;
-			for( int f = 0; f < available; f++ )           // Frame
-			for( int c = 0; c < packet->channels; c++ )    // Channel
-			for( int b = 0; b < this->sizeof_sample; b++ ) // Byte
+			for (int f = 0; f < available; f++)           // Frame
+			for (int c = 0; c < packet->channels; c++)    // Channel
+			for (int b = 0; b < this->sizeof_sample; b++) // Byte
 			{
 				this->data[i++] = packet->data[c][ 
 					(f+packet_written) * this->sizeof_sample + b

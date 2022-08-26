@@ -1,4 +1,3 @@
-
 // I have no idea what im doing
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
