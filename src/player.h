@@ -10,6 +10,13 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
+
+/* Temporary debug stuff */
+
+void debug_quit_decoder();
+
+/* Structures */
+
 struct DecoderState {
 	thrd_t 			thread;
 	int 			thread_run;

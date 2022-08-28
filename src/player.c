@@ -33,6 +33,19 @@ static void decoder_free(void);
 static struct PlayerState *player = NULL;
 static struct PlayerInfo   info;
 
+/* Debug stuff */
+
+static struct {
+	bool decoder_quit;
+} debug;
+void debug_quit_decoder()
+{
+	debug.decoder_quit = !debug.decoder_quit;
+}
+
+
+/* Function impl */
+
 struct PlayerState *_get_playerstate()
 {
 	return player;
@@ -145,6 +158,7 @@ float player_position_seconds(void)
 
 float player_duration_seconds(void)
 {
+	/* TODO fix wrong duration when decoding next track */
 	struct PlayerState *this = player;
 	if(!this || !this->av.track) return 0.0f;
 	return this->av.track->length / 1000.0f;
@@ -183,7 +197,6 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 
 	this->period      = 1024;
 	this->frames      = this->period * 215;
-	//this->frames      = this->period * 10;
 	
 	if (this->channels    != param->channels
 	||	this->sample_rate != param->sample_rate
@@ -215,7 +228,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->head.total = 0;
 		this->tail.total = 0;
 	} else {
-		if(flush){ // cut buffer
+		if (flush) { // cut buffer
 			this->head.total = this->tail.total + this->period;
 			this->head.ring  = this->tail.ring  + this->period;
 			this->head.ring %= this->frames;
@@ -257,7 +270,6 @@ int decoder_load(TrackId track_id, float seek)
 	decoder_free();
 
 	player->head.track_id = track_id;
-	player->head.done     = 0;
 
 	this->track     = track_load(track_id);
 	if(!this->track){
@@ -376,6 +388,7 @@ int decoder_load(TrackId track_id, float seek)
 	scuep_logf("Reconfig ok\n");
 
 	player->head.stream_changed  = player->head.total;
+	player->head.done     = 0;
 
 	return 0;
 error:
@@ -387,7 +400,7 @@ error:
 void decoder_start()
 {
 	struct DecoderState *this  = &player->av;
-	if( !this->thread_run )
+	if (!this->thread_run)
 		thrd_create( &this->thread, &decoder_loop, NULL );
 }
 
@@ -424,7 +437,7 @@ int decoder_loop(void*arg)
 		if( this->packet->stream_index != this->stream->index ) continue;
 		
 		ret  = avcodec_send_packet( this->codec_ctx, this->packet );
-		if( ret < 0 ){
+		if (ret < 0) {
 			scuep_logf("Send broke! %i\n", ret);
 			print_averr(ret);
 			break;
@@ -443,7 +456,8 @@ int decoder_loop(void*arg)
 
 			int64_t samples = this->frame->nb_samples;
 			
-			if(sample_pos > __start+__length) {
+			if(sample_pos > __start+__length || debug.decoder_quit) {
+				debug.decoder_quit = false;
 				player->head.done = true;
 				goto finish;
 			}
@@ -523,7 +537,7 @@ int player_write(
 	scuep_logf("DECODER_WRITE %i\n", head);
 
 	/* Loop until the whole packet has been written out */
-	while( left != 0 && this->av.thread_run ){
+	while (left != 0 && this->av.thread_run) {
 
 		int available = this->frames - 
 			           (this->head.total - 

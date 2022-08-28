@@ -121,12 +121,14 @@ int alsa_loop(void*arg)
 
 		uint32_t tail = player->tail.ring;
 
-
 		int total = MIN(player->head.total - player->tail.total, player->period);
 
 		if (total < player->period
 		||  player->pause 
 		){
+			if (player->head.done) 
+				player->pause = true;
+
 			snd_pcm_writei(pcm,
 				silence,
 				player->period

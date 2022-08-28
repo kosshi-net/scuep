@@ -212,6 +212,10 @@ void input_default( int key )
 			debug_mode = !debug_mode;
 			queue_redraw(ELEMENT_ALL);
 			break;
+		case 'D':
+			debug_quit_decoder();
+			break;
+
 		case '\n':
 		case KEY_ENTER:
 			frontend_play(this.cursor);
@@ -393,7 +397,7 @@ void draw_debug()
 	struct PlayerState *player = _get_playerstate();
 
 	for (size_t i = 0; i < term_cols; i++) {
-		mvprintw(layout.debug,i, "_" );
+		mvprintw(layout.debug,i, "-" );
 	}
 	for (size_t i = layout.debug+1; i <term_rows; i++) {
 		move(i,0);
@@ -419,9 +423,12 @@ void draw_debug()
 			,player->head.total - player->tail.total
 		);
 		mvprintw(layout.debug+2,0, 
-			"%.02f / %.02f",
+			"%.02f / %.02f "
+			"head: %li tail: %li",
 			player_position_seconds(),
-			player_duration_seconds()
+			player_duration_seconds(),
+			player->head.ring,
+			player->tail.ring
 		);
 	}
 }
