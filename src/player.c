@@ -453,7 +453,7 @@ int decoder_loop(void*arg)
 			int cut_back  = MAX( (sample_pos+samples)-(__start+__length), 0);
 			int total     = samples-cut_front-cut_back;
 
-			if(cut_front || cut_back){
+			if (cut_front || cut_back){
 				scuep_logf("%li, Frame %i+%i front %i, back %i\n", 
 						sample_pos,
 						this->codec_ctx->frame_number, 
@@ -545,7 +545,7 @@ int player_write(
 				available * this->sizeof_frame
 			);
 		} else {
-			// Nobody should use MP3 anyway
+			/* Nobody should use MP3 anyway */
 			int i = head * this->sizeof_frame;
 			for (int f = 0; f < available; f++)           // Frame
 			for (int c = 0; c < packet->channels; c++)    // Channel

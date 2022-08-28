@@ -1,6 +1,9 @@
 # Custom
 private/
 compile_commands.json
+bin/scuep
+bin/scuep-cue-to-urls
+src/sql.h
 
 # Prerequisites
 *.d

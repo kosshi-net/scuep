@@ -36,7 +36,7 @@
 
 #define ELEMENT_ALL      (0xFFFF-ELEMENT_PROPERTIES) // Redraw all elements
 
-// Use via queue_redraw(), not directly
+/* Use via queue_redraw(), not directly */
 static uint32_t elements_dirty = ELEMENT_ALL; 
 
 void queue_redraw(int elem){
@@ -56,8 +56,6 @@ static int debug_mode = 0;
 static SCREEN *screen = NULL;
 
 // These are zero-indexed!
-static int32_t playlist_items;
-static int32_t cursor_pos = 0;
 
 enum {
 	MODE_DEFAULT,
@@ -65,9 +63,20 @@ enum {
 	MODE_SEARCH,
 } input_mode = MODE_DEFAULT;
 
-static int input_repeat = 0;
 
-static bool should_quit = false;
+static struct {
+	int32_t input_repeat;
+	bool    should_quit;
+
+	/* Zero indexed */
+	int32_t playlist_items;
+	int32_t active;
+
+	int32_t cursor;
+	bool    cursor_locked;
+} this = {
+	.cursor_locked = true,
+};
 
 static struct {
 	int32_t pad[2];
@@ -75,6 +84,8 @@ static struct {
 	int32_t progress;
 	int32_t debug;
 } layout;
+
+
 
 void layout_update()
 {
@@ -114,10 +125,10 @@ int frontend_initialize(void)
 	init_pair(3, COLOR_YELLOW, -1);
 	init_pair(4, COLOR_RED, -1);
 
-	playlist_items = playlist_count();
+	this.playlist_items = playlist_count();
 
 	
-	while( !should_quit ){
+	while( !this.should_quit ){
 		frontend_tick();
 	}
 
@@ -163,6 +174,37 @@ int frontend_terminate(void)
 	return 0;
 }
 
+void frontend_play(int id)
+{
+	this.active = id;
+	player_load( playlist_track( id+1 ) );
+	player_play();
+
+	if (this.cursor_locked)
+		this.cursor = this.active;
+
+	queue_redraw(ELEMENT_CAROUSEL);
+}
+
+void frontend_next(int32_t num){
+	this.active += num;
+	this.active = ( this.playlist_items + this.active ) % this.playlist_items;
+	frontend_play(this.active);
+}
+
+void cursor_lock()
+{
+	this.cursor_locked = true;
+	this.cursor = this.active;
+	queue_redraw(ELEMENT_ALL);
+}
+
+
+void cursor_free()
+{
+	this.cursor_locked = false;
+}
+
 void input_default( int key )
 {
 	switch (key) {
@@ -172,8 +214,8 @@ void input_default( int key )
 			break;
 		case '\n':
 		case KEY_ENTER:
-			player_load( playlist_track( 1 + cursor_pos ) );
-			player_play();
+			frontend_play(this.cursor);
+			cursor_lock();
 			break;
 
 		case KEY_RIGHT:
@@ -183,11 +225,15 @@ void input_default( int key )
 			player_seek_relative(-5.0);
 			break;
 
+		case 27: /* Escape */
+			cursor_lock();
+			break;
+
 		case 'z':
-			// previous
+			frontend_next(-1);
 			break;
 		case 'b':
-			// next
+			frontend_next(1);
 			break;
 		
 		case 'x':
@@ -207,38 +253,38 @@ void input_default( int key )
 
 		case 'k':
 		case KEY_UP:
-			cursor_pos -= MAX(1, input_repeat);
-			input_repeat = 0;
-			cursor_pos = ( playlist_items + cursor_pos ) % playlist_items;
+			cursor_free();
+			this.cursor -= MAX(1, this.input_repeat);
+			this.input_repeat = 0;
+			this.cursor = ( this.playlist_items + this.cursor ) % this.playlist_items;
 			queue_redraw(ELEMENT_CAROUSEL);
 			break;	
 		case 'j':
 		case KEY_DOWN:
-			cursor_pos += MAX( 1, input_repeat );
-			input_repeat = 0;
-			cursor_pos = ( playlist_items + cursor_pos ) % playlist_items;
+			cursor_free();
+			this.cursor += MAX( 1, this.input_repeat );
+			this.input_repeat = 0;
+			this.cursor = ( this.playlist_items + this.cursor ) % this.playlist_items;
 			queue_redraw(ELEMENT_CAROUSEL);
 			break;
 		case 'q':
-			should_quit = true;
+			this.should_quit = true;
 			break;	
 
 		case '1': case '2': case '3': 
 		case '4': case '5': case '6': 
 		case '7': case '8': case '9':
 		case '0': 
-			input_repeat = input_repeat*10 + (key-'0');
+			this.input_repeat = this.input_repeat*10 + (key-'0');
 			break;
 	}
 }
 
 void input(){
-
 	timeout(100);
 	int key = getch();
 
-	while( key != ERR ){
-		
+	while (key != ERR) {
 		switch(input_mode){
 			case MODE_DEFAULT:
 				input_default(key);
@@ -250,7 +296,6 @@ void input(){
 		timeout(0);
 		key = getch();
 	}
-
 }
 
 
@@ -267,7 +312,7 @@ void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
 		col -= total;
 	}
 	mvprintw( row, col, "%S", wccut);
-	if( cut )
+	if (cut)
 		mvprintw( row, col+wcw, "%.*s", w-wcw, ".....");
 }
 
@@ -276,18 +321,18 @@ static uint32_t rcount = 0;
 void draw_carousel()
 {
 
-	mvprintw(1, layout.pad[0], "Playlist: %i / %i", cursor_pos , playlist_items);
+	mvprintw(1, layout.pad[0], "Playlist: %i / %i", this.cursor , this.playlist_items);
 	mvprintw(1, term_cols-layout.pad[0] - 15, "scuep-ffsql 0.0" );
 
 	static wchar_t wctext[1024] = {0};
 
 	int items = playlist_count();
-	int center = MIN( term_rows/2, cursor_pos+layout.carousel[0] );
+	int center = MIN( term_rows/2, this.cursor+layout.carousel[0] );
 	int row;
 
-	for (int i = cursor_pos-center; i < items; i++) {
+	for (int i = this.cursor-center; i < items; i++) {
 
-		row = i - cursor_pos + center;
+		row = i - this.cursor + center;
 
 		if (row <  layout.carousel[0]) continue;
 		if (row >= layout.carousel[1]) break;
@@ -298,7 +343,10 @@ void draw_carousel()
 		move(row, 0);
 		clrtoeol();
 
-		if (i == cursor_pos) {
+		if (i == this.cursor) {
+			mvprintw( row, 1, "~" );
+		}
+		if (i == this.active) {
 			mvprintw( row, 1, ">" );
 		}
 
@@ -357,21 +405,23 @@ void draw_debug()
 
 	if(!player){
 		mvprintw(layout.debug+1,0, "%s", "Player uninitialized" );
-		
 	} else {
-
 		mvprintw(layout.debug+1,0, 
 			" paused: %i"
 			" done: %i"
 			" decoder: %i"
 			" sndsvr %i"
-			" buffer: %i"
+			" buffer: %li"
 			,player->pause 
 			,player->head.done 
 			,player->av.thread_run 
 			,!!player->sndsvr_close
 			,player->head.total - player->tail.total
-
+		);
+		mvprintw(layout.debug+2,0, 
+			"%.02f / %.02f",
+			player_position_seconds(),
+			player_duration_seconds()
 		);
 	}
 }
@@ -379,10 +429,12 @@ void draw_debug()
 void draw_progress()
 {
 	float fprogress = player_position_seconds();
-	int progress = fprogress;
-	//mvprintw( 0, 50, "pos: %f", fprogress );
+	int progress = round(fprogress);
 
-	int duration = player_duration_seconds();
+	move(layout.progress, 0);
+	clrtoeol();
+
+	int duration = round(player_duration_seconds());
 
 	char buf[1024];
 
@@ -400,12 +452,12 @@ void draw_progress()
 
 	if (l-r >= 20) {
 		l-=11;
-		mvprintw( layout.progress, l, "Volume 100%%");
+		mvprintw(layout.progress, l, "Volume 100%%");
 		l-=2;
 	}
 
 	
-	int32_t pos = round( (l-r) * (fprogress/(float)duration) );
+	int32_t pos = floor( (l-r-1) * (fprogress/(float)duration) );
 	pos += r;
 
 	while (l-r > 0) {
