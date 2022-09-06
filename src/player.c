@@ -55,7 +55,7 @@ const struct PlayerInfo *player_get_info(void)
 {
 	info.player = player; 
 
-	if(info.player == NULL) return &info;
+	if (info.player == NULL) return &info;
 
 	info.paused   = player->pause;
 	info.track_id = player->tail.track_id;
@@ -65,9 +65,11 @@ const struct PlayerInfo *player_get_info(void)
 
 	info.next_available = false;
 
-	if( player->head.done 
-	&&  player->head.total == player->tail.total )
+	if (player->head.done 
+	&&  player->head.total == player->tail.total
+	) {
 		info.next_available = true;
+	}
 
 	return &info;
 }
@@ -90,21 +92,21 @@ void print_averr(int err){
  */
 
 void player_init(void){
-	if(!player) player = calloc(sizeof(struct PlayerState), 1);
+	if (!player) player = calloc(sizeof(struct PlayerState), 1);
 }
 
 int player_play(void){
-	if(!player) return 1;
+	if (!player) return 1;
 	player->pause = 0;
 	return 0;
 }
 int player_pause(void){
-	if(!player) return 1;
+	if (!player) return 1;
 	player->pause = 1;
 	return 0;
 }
 int player_toggle(void){
-	if(!player) return 1;
+	if (!player) return 1;
 	player->pause = !player->pause;
 	return 0;
 }
@@ -112,22 +114,22 @@ int player_toggle(void){
 
 int player_load(TrackId track_id)
 {
-	if(!player)
+	if (!player)
 		player_init();
 	decoder_load(track_id, 0.0);
 	decoder_start();
-	if(!player->sndsvr_close) alsa_open( player );
+	if (!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
 
 int player_seek(float seconds)
 {
 	struct PlayerState *this = player;
-	if(!this) return -1;
+	if (!this) return -1;
 
 	decoder_load(this->tail.track_id, seconds);
 	decoder_start();
-	if(!player->sndsvr_close) alsa_open( player );
+	if (!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
 
@@ -135,7 +137,7 @@ int player_seek(float seconds)
 int player_seek_relative(float seconds)
 {
 	struct PlayerState *this = player;
-	if(!this) return -1;
+	if (!this) return -1;
 
 	float seek = player_position_seconds() + seconds;
 
@@ -148,7 +150,7 @@ int player_seek_relative(float seconds)
 float player_position_seconds(void)
 {
 	struct PlayerState *this = player;
-	if(!this) return 0.0f;
+	if (!this) return 0.0f;
 	
 	float pos = this->tail.total   -
 	            this->tail.stream_changed  + 
@@ -160,30 +162,30 @@ float player_duration_seconds(void)
 {
 	/* TODO fix wrong duration when decoding next track */
 	struct PlayerState *this = player;
-	if(!this || !this->av.track) return 0.0f;
+	if (!this || !this->av.track) return 0.0f;
 	return this->av.track->length / 1000.0f;
 }
 
 TrackId player_current_track()
 {
-	if(!player) return 0;
+	if (!player) return 0;
 	return player->tail.track_id;
 }
 
 int player_stop(void)
 {
 	struct PlayerState *this = player;
-	if(!this) return 1;
+	if (!this) return 1;
 
-	if( this->sndsvr_close ) this->sndsvr_close();
+	if (this->sndsvr_close) this->sndsvr_close();
 	decoder_free();
 	scuep_logf("Freeing player\n");
 
-	if( this->data ) {
+	if (this->data) {
 		free(this->data);
 		this->data = NULL;
 	}
-	free( player );
+	free(player);
 
 	player = NULL; 
 
@@ -196,7 +198,8 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 	struct PlayerState *this = player;
 
 	this->period      = 1024;
-	this->frames      = this->period * 215;
+	//this->frames      = this->period * 215;
+	this->frames      = this->period * 20;
 	
 	if (this->channels    != param->channels
 	||	this->sample_rate != param->sample_rate
@@ -204,8 +207,8 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 	||  this->pause       == true 
 	){
 		scuep_logf("Hard reconfig\n");
-		if( this->sndsvr_close ) this->sndsvr_close();
-		if( this->data ) {
+		if (this->sndsvr_close) this->sndsvr_close();
+		if (this->data) {
 			free(this->data);
 			this->data = NULL;
 		}
@@ -219,8 +222,8 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->size          = this->frames * this->sizeof_frame;
 
 		this->data    = malloc(this->size);
-		if(1){
-			for( int i = 0; i < this->size; i++ )
+		if (1) {
+			for (int i = 0; i < this->size; i++)
 				this->data[i] = rand();
 		}
 		this->head.ring = 0;
@@ -228,7 +231,9 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->head.total = 0;
 		this->tail.total = 0;
 	} else {
-		if (flush) { // cut buffer
+		if (flush 
+		 && this->head.total + this->period > this->tail.total
+		) { 
 			this->head.total = this->tail.total + this->period;
 			this->head.ring  = this->tail.ring  + this->period;
 			this->head.ring %= this->frames;
@@ -244,19 +249,19 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 
 void decoder_free()
 {
-	if(!player) return;
+	if (!player) return;
 
 	decoder_stop();
 	struct DecoderState *this = &player->av;
 	
-	if(this->format)    avformat_close_input(&this->format);
+	if (this->format)    avformat_close_input(&this->format);
 	// AVCodec is freed by format?
-	if(this->codec_ctx) avcodec_free_context(&this->codec_ctx);
+	if (this->codec_ctx) avcodec_free_context(&this->codec_ctx);
 
-	if(this->packet)    av_packet_free(&this->packet);
-	if(this->frame)     av_frame_free(&this->frame);
+	if (this->packet)    av_packet_free(&this->packet);
+	if (this->frame)     av_frame_free(&this->frame);
 
-	if(this->track)     this->track = track_free(this->track);
+	if (this->track)     this->track = track_free(this->track);
 
 	this->stream = NULL;
 }
@@ -272,7 +277,7 @@ int decoder_load(TrackId track_id, float seek)
 	player->head.track_id = track_id;
 
 	this->track     = track_load(track_id);
-	if(!this->track){
+	if (!this->track){
 		scuep_logf("Failed to load track (database error?)\n");
 		return -1;
 	}
@@ -303,7 +308,7 @@ int decoder_load(TrackId track_id, float seek)
 		scuep_logf( "Stream %i type: %s\n", i, stream_type);
         if (type == AVMEDIA_TYPE_AUDIO) stream_index = i;
     }
-	if(stream_index== -1){
+	if (stream_index== -1){
 		scuep_logf( "No suitable stream!\n");
 		return -1;
 	}
@@ -319,7 +324,7 @@ int decoder_load(TrackId track_id, float seek)
 	int sample_rate = param->sample_rate;
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
 
-	if(track->length < 1) {
+	if (track->length < 1) {
 		scuep_logf("Recalculating duration...\n");
 		int64_t recalc_dur =  av_rescale_q(
 			this->stream->duration,
@@ -334,8 +339,6 @@ int decoder_load(TrackId track_id, float seek)
 	int __length = track->length  * (sample_rate/1000.0f) - __seek;
 	scuep_logf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
 	
-
-
 	int64_t seek_to = av_rescale_q(
 			__start, 
 			sample_scale,
@@ -345,16 +348,16 @@ int decoder_load(TrackId track_id, float seek)
 	player->head.stream_offset = __seek;
 
 	ret = av_seek_frame( this->format, stream_index, seek_to, AVSEEK_FLAG_BACKWARD );
-	if(ret<0) goto error;
+	if (ret<0) goto error;
 
 	this->codec = avcodec_find_decoder( param->codec_id );
 	this->codec_ctx = avcodec_alloc_context3( this->codec );
 
 	ret = avcodec_parameters_to_context( this->codec_ctx, param );
-	if(ret<0) goto error;
+	if (ret<0) goto error;
 	
 	ret = avcodec_open2(this->codec_ctx, this->codec, NULL);
-	if(ret<0) goto error;
+	if (ret<0) goto error;
 
 	this->packet = av_packet_alloc();
 	this->frame  = av_frame_alloc();
@@ -362,7 +365,7 @@ int decoder_load(TrackId track_id, float seek)
 
 	int sizeof_sample = av_get_bytes_per_sample(param->format);
 	int channels    = param->channels;
-	if(channels != 2) {
+	if (channels != 2) {
 		scuep_logf("Channel count of %i is not yet supported", channels);
 		goto error;
 	}
@@ -432,9 +435,9 @@ int decoder_loop(void*arg)
 	while(this->thread_run){
 		av_packet_unref(this->packet);
 		ret = av_read_frame(this->format, this->packet);
-		if(ret < 0) goto error;
+		if (ret < 0) goto error;
 
-		if( this->packet->stream_index != this->stream->index ) continue;
+		if (this->packet->stream_index != this->stream->index) continue;
 		
 		ret  = avcodec_send_packet( this->codec_ctx, this->packet );
 		if (ret < 0) {
@@ -456,18 +459,18 @@ int decoder_loop(void*arg)
 
 			int64_t samples = this->frame->nb_samples;
 			
-			if(sample_pos > __start+__length || debug.decoder_quit) {
+			if (sample_pos > __start+__length || debug.decoder_quit) {
 				debug.decoder_quit = false;
 				player->head.done = true;
 				goto finish;
 			}
-			if(!samples)        continue;
+			if (!samples)        continue;
 
 			int cut_front = MAX( __start - sample_pos, 0);
 			int cut_back  = MAX( (sample_pos+samples)-(__start+__length), 0);
 			int total     = samples-cut_front-cut_back;
 
-			if (cut_front || cut_back){
+			if (cut_front || cut_back) {
 				scuep_logf("%li, Frame %i+%i front %i, back %i\n", 
 						sample_pos,
 						this->codec_ctx->frame_number, 
@@ -501,7 +504,7 @@ void player_write_blank_period()
 	uint64_t head = this->head.ring;
 	uint64_t next = (head / this->period ) * this->period;
 	
-	if(next == head) return;	
+	if (next == head) return;	
 	
 	next += this->period;
 	uint64_t total = next - head;
@@ -547,12 +550,12 @@ int player_write(
 		available = MIN(available, left);
 
 
-		if(available == 0){
+		if (available == 0){
 			sleep_ms(5);
 			continue;
 		}
 
-		if(interleaved){
+		if (interleaved){
 			memcpy( 
 				this->data      + (head     * this->sizeof_frame), 
 				packet->data[0] + (packet_written * this->sizeof_frame),  
@@ -573,11 +576,12 @@ int player_write(
 
 		head += available;
 		head %= this->frames;
-		this->head.ring = head;
-		this->head.total += available;
 
 		packet_written += available;
 		left -= available;
+
+		this->head.ring = head;
+		this->head.total += available;
 	}
 	return 0;
 }

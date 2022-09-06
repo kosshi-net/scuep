@@ -126,9 +126,6 @@ int alsa_loop(void*arg)
 		if (total < player->period
 		||  player->pause 
 		){
-			if (player->head.done) 
-				player->pause = true;
-
 			snd_pcm_writei(pcm,
 				silence,
 				player->period
@@ -143,7 +140,7 @@ int alsa_loop(void*arg)
 				total
 			);
 			scuep_logf("PCM FRAMES %li %li\n", frames, total);
-			if(frames < 0) break;
+			if (frames < 0) break;
 			total -= frames;
 		}
 		
