@@ -2,11 +2,11 @@
 A simple terminal music player for GNU/Linux.
 
 ## This branch is depricated
-Complete rewrite and redesign is (slowly) happening in branch ffsql. Once it reaches feature-parity with Master, this will be replaced and a first release scheduled soon™ after.
+Complete rewrite and redesign is (slowly) happening in branch ffsql. It features a much nicer technical design, using a completely custom backend. 
 
-The player in this branch is perfectly funcional even if little unpolished. However the codebase has outgrown itself.
+The player in this branch is perfectly funcional even if quite unpolished. However the codebase has far outgrown itself, it was never supposed to become a real music player!
 
-## Still very much WORK IN PROGRESS!
+![Pretty picture](img/img.png?raw=true)
 
 Features:
 - Supports playback for basically every file type imaginable (libmpv)
