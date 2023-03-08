@@ -139,7 +139,7 @@ int alsa_loop(void*arg)
 				player->data + tail * player->sizeof_frame,
 				total
 			);
-			scuep_logf("PCM FRAMES %li %li\n", frames, total);
+			//scuep_logf("PCM FRAMES %li %li\n", frames, total);
 			if (frames < 0) break;
 			total -= frames;
 		}

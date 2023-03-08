@@ -95,7 +95,7 @@ enum Flag parse_flag( char* str )
 "--version\n" \
 "    Print version\n" \
 "--debug\n" \
-"    Enable logging \n" \
+"    Enable logging to stderr. Use with 2>log.txt.\n" \
 "--ro\n" \
 "    Don't overwrite playlist saved in .config\n" \
 "-i, -\n" \

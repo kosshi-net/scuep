@@ -198,14 +198,18 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 	struct PlayerState *this = player;
 
 	this->period      = 1024;
-	//this->frames      = this->period * 215;
-	this->frames      = this->period * 20;
+	this->frames      = this->period * 215;
 	
 	if (this->channels    != param->channels
 	||	this->sample_rate != param->sample_rate
 	||	this->format      != param->format
-	||  this->pause       == true 
+	// ??? ||  this->pause       == true  
 	){
+		if (!flush) {
+			scuep_logf("Could not soft reconfig:\n");
+			scuep_logf("Current stream is not compatible with the next stream\n");
+			return 1;
+		}
 		scuep_logf("Hard reconfig\n");
 		if (this->sndsvr_close) this->sndsvr_close();
 		if (this->data) {
@@ -232,7 +236,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->tail.total = 0;
 	} else {
 		if (flush 
-		 && this->head.total + this->period > this->tail.total
+		 && this->head.total > this->tail.total
 		) { 
 			this->head.total = this->tail.total + this->period;
 			this->head.ring  = this->tail.ring  + this->period;
@@ -297,7 +301,7 @@ int decoder_load(TrackId track_id, float seek)
 	 * SELECT STREAM *
 	 *****************/
 
-	scuep_logf( "Track has %i stream(s)\n", this->format->nb_streams  );
+	scuep_logf("Track has %i stream(s)\n", this->format->nb_streams);
     int stream_index = -1;
     for (int i = 0; i < this->format->nb_streams; i++) 
 	{
@@ -338,6 +342,7 @@ int decoder_load(TrackId track_id, float seek)
 	int __start  = track->start   * (sample_rate/1000.0f) + __seek;
 	int __length = track->length  * (sample_rate/1000.0f) - __seek;
 	scuep_logf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
+	scuep_logf("Period mod: %i\n", __length % 1024);
 	
 	int64_t seek_to = av_rescale_q(
 			__start, 
@@ -387,8 +392,10 @@ int decoder_load(TrackId track_id, float seek)
 	 **************/
 
 	scuep_logf("Open audio\n");
-	player_reconfig( param, true );
-	scuep_logf("Reconfig ok\n");
+	ret = player_reconfig(param, true);
+	if (!ret)
+		scuep_logf("Reconfig ok\n");
+	else goto error;
 
 	player->head.stream_changed  = player->head.total;
 	player->head.done     = 0;
@@ -432,24 +439,23 @@ int decoder_loop(void*arg)
 	int __start  = track->start   * (sample_rate*0.001) ;
 	int __length = track->length  * (sample_rate*0.001) ;
 
-	while(this->thread_run){
+	while (this->thread_run) {
 		av_packet_unref(this->packet);
 		ret = av_read_frame(this->format, this->packet);
 		if (ret < 0) goto error;
 
 		if (this->packet->stream_index != this->stream->index) continue;
 		
-		ret  = avcodec_send_packet( this->codec_ctx, this->packet );
+		ret = avcodec_send_packet( this->codec_ctx, this->packet );
 		if (ret < 0) {
 			scuep_logf("Send broke! %i\n", ret);
 			print_averr(ret);
 			break;
 		}
 
-		while( ret >= 0 && this->thread_run ){
+		while (ret >= 0 && this->thread_run) {
 
 			ret = avcodec_receive_frame( this->codec_ctx, this->frame);
-			
 
 			int64_t sample_pos = av_rescale_q(
 					this->frame->pts, 
@@ -537,7 +543,7 @@ int player_write(
 
 	uint32_t head = this->head.ring;
 
-	scuep_logf("DECODER_WRITE %i\n", head);
+	//scuep_logf("DECODER_WRITE %i\n", head);
 
 	/* Loop until the whole packet has been written out */
 	while (left != 0 && this->av.thread_run) {
