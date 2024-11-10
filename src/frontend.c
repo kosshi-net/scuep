@@ -61,11 +61,6 @@ static int debug_mode = 0;
 
 static SCREEN *screen = NULL;
 
-// These are zero-indexed!
-
-
-
-
 static struct {
 	int32_t input_repeat;
 	bool    should_quit;
@@ -115,15 +110,15 @@ void prompt_set_prefix_w(wchar_t *str){
 	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.w));
 }
 
-void command_clear_c(void)
+void prompt_clear_c(void)
 {
 	memset(this.cmd.c, 0, sizeof(this.cmd.c));
 	this.cmd.c_len = 0;
 	scuep_logf("cmd.c cleared\n");
 }
-void command_clear(void)
+void prompt_clear(void)
 {
-	command_clear_c();
+	prompt_clear_c();
 	memset(this.cmd.w, 0, sizeof(this.cmd.w));
 	this.cmd.w_len = 0;
 	this.cmd.cursor = 0;
@@ -140,7 +135,7 @@ void command_delete(int32_t pos){
 	this.cmd.w_len--;
 }
 
-void command_insert(char c)
+void prompt_insert(char c)
 {
 	scuep_logf("Insert %i to %i\n", c, this.cmd.c_len);
 	this.cmd.c[this.cmd.c_len++] = c;
@@ -162,13 +157,12 @@ void command_insert(char c)
 
 	for (size_t i = 0; i < ret; i++){
 		this.cmd.w[this.cmd.cursor++] = w[i];
-
 	}
 
-	command_clear_c();
+	prompt_clear_c();
 }
 
-void input_command(int key)
+void input_prompt(int key)
 {
 
 	scuep_logf("%i\n", key);
@@ -198,11 +192,16 @@ void input_command(int key)
 			break;
 
 		default:
-			command_insert(key);
+			prompt_insert(key);
 			break;
 	}
 	this.cmd.cursor = MIN(MAX(this.cmd.cursor, 0),this.cmd.w_len);
 	queue_redraw(ELEMENT_PROMPT);
+}
+
+void command_run(char*cmd)
+{
+
 }
 
 void layout_update()
@@ -249,7 +248,7 @@ int frontend_initialize(void)
 	this.playlist_items = playlist_count();
 
 	
-	while( !this.should_quit ){
+	while(!this.should_quit){
 		frontend_tick();
 	}
 
@@ -292,8 +291,7 @@ int frontend_tick(void)
 
 
 	/*
-	 * Temporary autoplay 
-	 * TODO: utilize predecoding ability of player for smooth transitions
+	 * TODO: Hotwired Autoplay 
 	 */
 	struct PlayerState *player = _get_playerstate();
 	if (player) {
@@ -326,7 +324,8 @@ void frontend_play(int id)
 	queue_redraw(ELEMENT_CAROUSEL);
 }
 
-void frontend_next(int32_t num){
+void frontend_next(int32_t num)
+{
 	this.active += num;
 	this.active = ( this.playlist_items + this.active ) % this.playlist_items;
 	frontend_play(this.active);
@@ -351,7 +350,7 @@ void input_default(int key)
 {
 	switch (key) {
 		case ':':
-			command_clear();
+			prompt_clear();
 			this.input_mode = MODE_COMMAND;
 			prompt_set_prefix(":");
 			break;
@@ -441,7 +440,7 @@ void input(){
 				input_default(key);
 				break;
 			case MODE_COMMAND:
-				input_command(key);
+				input_prompt(key);
 				break;
 			default:
 				scuep_logf("Invalid input mode, resetting to default\n");
@@ -648,24 +647,5 @@ void draw_prompt()
 		printw("%C", wc);
 		attroff(COLOR_PAIR(5));
 	}
-
-	if(0){
-	mvprintw(layout.prompt, 1, "%S", this.cmd.w);
-
-	if (this.input_mode == MODE_COMMAND) {
-
-		move(layout.prompt, 1+this.cmd.cursor);
-
-		attron(COLOR_PAIR(5));
-		if (this.cmd.cursor < this.cmd.w_len)
-			printw("%c", this.cmd.w[this.cmd.cursor]);
-		else
-			printw(" ");
-
-		attroff(COLOR_PAIR(5));
-
-	}
-	}
 }
-
 

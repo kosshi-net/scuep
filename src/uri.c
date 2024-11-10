@@ -12,7 +12,7 @@ char *path_from_uri(char*uri)
 
 	char *buffer = calloc( uri_len+1, 1 );
 
-	if (prefix(CUE_PREFIX, uri)) {
+	if (scuep_prefix(CUE_PREFIX, uri)) {
 		int pre_len = strlen(CUE_PREFIX);
 
 		int i;

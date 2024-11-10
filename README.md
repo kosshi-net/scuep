@@ -15,13 +15,15 @@ Unimplemented features
 - Remote control
 - Selections
 
-Other issues
+Other issues and bugs
 - FFmpeg decodes to native endianess while alsa driver always assumes little-endian
 - Currently only alsa is supported, but adding native support for other sound servers is trivial (~150 line file)
 	- All relevant sound servers can take alsa audio, so this isn't even a big issue. 
 - Not tested on other \*nixes
 - wchar_t must be a non-multibyte encoding of unicode (eg UTF-32)
 - Decoder edge case bugs
+- Playback sometimes freezes at the end of tracks
+- Sometimes pausing causes 100% cpu usage
 
 ## License
 GPLv2

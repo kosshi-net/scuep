@@ -58,7 +58,7 @@ const struct PlayerInfo *player_get_info(void)
 	if (info.player == NULL) return &info;
 
 	info.paused   = player->pause;
-	info.track_id = player->tail.track_id;
+	info.track_id = player->track_id;
 
 	info.progress = player_position_seconds();
 	info.duration = player_duration_seconds();
@@ -127,7 +127,7 @@ int player_seek(float seconds)
 	struct PlayerState *this = player;
 	if (!this) return -1;
 
-	decoder_load(this->tail.track_id, seconds);
+	decoder_load(this->track_id, seconds);
 	decoder_start();
 	if (!player->sndsvr_close) alsa_open( player );
 	return 0;
@@ -169,7 +169,7 @@ float player_duration_seconds(void)
 TrackId player_current_track()
 {
 	if (!player) return 0;
-	return player->tail.track_id;
+	return player->track_id;
 }
 
 int player_stop(void)
@@ -278,7 +278,7 @@ int decoder_load(TrackId track_id, float seek)
 	
 	decoder_free();
 
-	player->head.track_id = track_id;
+	player->track_id = track_id;
 
 	this->track     = track_load(track_id);
 	if (!this->track){

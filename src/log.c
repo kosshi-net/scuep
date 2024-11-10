@@ -7,17 +7,20 @@
 
 static bool enable_logging = false;
 
-void scuep_log_start( char *path ){
+void scuep_log_start(void)
+{
 	if(enable_logging) return;
 	enable_logging = true;
 }
 
-void scuep_log_stop(){
+void scuep_log_stop(void)
+{
 	if(!enable_logging) return;
 	enable_logging = false;
 }
 
-void scuep_logf(const char *format, ...){
+void scuep_logf(const char *format, ...)
+{
 	if(!enable_logging) return;
 
 	va_list args;

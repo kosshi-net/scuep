@@ -50,7 +50,7 @@ void sleep_ms( uint32_t );
 time_t time_ms(void);
 
 // Returns true when str starts with pre
-bool prefix(const char *pre, const char *str);
+bool scuep_prefix(const char *pre, const char *str);
 
 char *read_stdin();
 

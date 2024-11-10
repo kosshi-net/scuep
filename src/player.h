@@ -49,27 +49,31 @@ struct PlayerState {
 	uint32_t sizeof_frame;
 	uint32_t sizeof_sample;
 
+	TrackId  track_id; /* TODO Will be removed? */
+
 	// Atomics accessed locklessly, make sure value changes mid-function are 
 	// not an issue, eg sample and cache the values. Make sure to do full 
 	// writes. 
 	
 	struct {
+		TrackId  track_id;
+
 		_Atomic uint64_t ring;          // Position in ring buffer
 		_Atomic uint64_t total;         // Total frames decoded
 		_Atomic bool     done;
 
-		_Atomic TrackId  track_id;
 		_Atomic uint64_t stream_changed; 
 		_Atomic uint64_t stream_offset;
 
 	} head;
 
 	struct {
+		TrackId  track_id;
+
 		_Atomic uint64_t ring;    
 		_Atomic uint64_t total;          // Total frames played
 		_Atomic bool     done;
 
-		_Atomic TrackId  track_id;
 		_Atomic uint64_t stream_changed; 
 		_Atomic uint64_t stream_offset;
 	} tail;
@@ -106,17 +110,14 @@ struct PlayerInfo {
 	// Pause state
 	bool   	            paused;          
 
-	// Set to true when decoder or sndsvr goes idle. 
-	// player_load_next() clears this flag regardless of success when only
-	// decoder is idle. 
-	bool                next_available;  
-	
 	// Currently playing track. Decoder may be decoding a different one. 
 	TrackId             track_id;
 
 	// In seconds
 	float               duration;
 	float               progress;
+
+	bool next_available; /* TODO Will be removed? */
 	
 };
 
@@ -124,7 +125,6 @@ struct PlayerInfo {
 const struct PlayerInfo *player_get_info();
 
 int player_load(TrackId);
-int player_load_next(TrackId);
 
 // Debugging purposes
 struct PlayerState *_get_playerstate();

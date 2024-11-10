@@ -115,7 +115,7 @@ int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width
 }
  
 /* Returns true when str starts with pre */
-bool prefix(const char *pre, const char *str){
+bool scuep_prefix(const char *pre, const char *str){
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
