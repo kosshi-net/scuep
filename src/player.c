@@ -200,7 +200,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 	this->period      = 1024;
 	this->frames      = this->period * 215;
 	
-	if (this->channels    != param->channels
+	if (this->channels    != param->ch_layout.nb_channels
 	||	this->sample_rate != param->sample_rate
 	||	this->format      != param->format
 	// ??? ||  this->pause       == true  
@@ -217,7 +217,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 			this->data = NULL;
 		}
 
-		this->channels    = param->channels;
+		this->channels    = param->ch_layout.nb_channels;
 		this->sample_rate = param->sample_rate;
 		this->format      = param->format;
 		
@@ -369,7 +369,7 @@ int decoder_load(TrackId track_id, float seek)
 
 
 	int sizeof_sample = av_get_bytes_per_sample(param->format);
-	int channels    = param->channels;
+	int channels    = param->ch_layout.nb_channels;
 	if (channels != 2) {
 		scuep_logf("Channel count of %i is not yet supported", channels);
 		goto error;
@@ -479,7 +479,7 @@ int decoder_loop(void*arg)
 			if (cut_front || cut_back) {
 				scuep_logf("%li, Frame %i+%i front %i, back %i\n", 
 						sample_pos,
-						this->codec_ctx->frame_number, 
+						this->codec_ctx->frame_num, 
 						this->frame->nb_samples, 
 						cut_front, total
 				);
@@ -571,7 +571,7 @@ int player_write(
 			/* Nobody should use MP3 anyway */
 			int i = head * this->sizeof_frame;
 			for (int f = 0; f < available; f++)           // Frame
-			for (int c = 0; c < packet->channels; c++)    // Channel
+			for (int c = 0; c < packet->ch_layout.nb_channels; c++)    // Channel
 			for (int b = 0; b < this->sizeof_sample; b++) // Byte
 			{
 				this->data[i++] = packet->data[c][ 
