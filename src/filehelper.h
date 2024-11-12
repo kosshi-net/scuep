@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -8,7 +7,7 @@
 
 // libcue will complain about UTF8 BOM.
 // Check for it and return the length
-int scuep_bom_length(char *string){
+static int scuep_bom_length(char *string){
 	if( (unsigned char)string[0] == 0xEF
 	&&  (unsigned char)string[1] == 0xBB
 	&&  (unsigned char)string[2] == 0xBF
@@ -18,7 +17,7 @@ int scuep_bom_length(char *string){
 
 // libcue parses REMs and throws bunch of trash to stderr, just filter them.
 // Does not handle indented REMs properly, are they in spec anyway?
-void scuep_remove_rems(char *string){
+static void scuep_remove_rems(char *string){
 	char *c = string;
 	int i = 0;
 	int in_rem = 0;
@@ -42,7 +41,7 @@ void scuep_remove_rems(char *string){
 }
 
 // Rename this!! Only use for reading cue files!
-char *scuep_read_file(char *path){
+static char *scuep_read_file(char *path){
 	FILE *f = fopen(path, "r");
 
 	if(f==NULL) return NULL;
