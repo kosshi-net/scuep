@@ -274,7 +274,8 @@ void load_playlist(char *playlist)
 
 			// Copy path
 			int prot_len = strlen("cue://");
-			strncpy( path, clip+prot_len , MAX_PATH_LEN );
+			strncpy(path, clip+prot_len, MAX_PATH_LEN);
+			path[MAX_PATH_LEN-1] = '\0';
 
 
 			char *string = scuep_read_file( path );
@@ -303,7 +304,8 @@ void load_playlist(char *playlist)
 		}
 		else
 		{ // Misc file, use taglib
-			strncpy( path, uri , MAX_PATH_LEN );
+			strncpy(path, uri, MAX_PATH_LEN);
+			path[MAX_PATH_LEN-1] = '\0';
 			printf("%s\n", uri);
 
 

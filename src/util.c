@@ -82,13 +82,14 @@ wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
 		needle_case[i] = towupper(needle[i]);
 
 	wchar_t *p = wcsstr(haystack_case, needle_case);
+	wchar_t *haystack_temp = haystack + (p - haystack_case);
 
 	free(haystack_case);
 	free(needle_case);
 
 	if(!p) return p;
 
-	return haystack + (p - haystack_case);
+	return haystack_temp;
 
 }
 
