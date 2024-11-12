@@ -483,8 +483,9 @@ void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
 void draw_carousel(void)
 {
 
-	mvprintw(1, layout.pad[0], "Playlist: %i / %i", this.cursor , this.playlist_items);
-	mvprintw(1, term_cols-layout.pad[0] - 15, "scuep-ffsql 0.0" );
+	mvprintw(1, layout.pad[0], "Playlist: %i / %i", this.cursor+1, this.playlist_items);
+	clrtoeol();
+	mvprintw(1, term_cols-layout.pad[0] - 11, "scuep-ffsql" );
 
 	static wchar_t wctext[1024] = {0};
 
