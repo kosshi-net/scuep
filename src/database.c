@@ -246,24 +246,21 @@ int playlist_clear(void)
 
 int playlist_count(void)
 {
-	int rc;
 	static sqlite3_stmt *stmt;
-	prepare( &stmt, "SELECT COUNT(*) FROM playlist");
 
-	rc = sqlite3_step(stmt);
+	prepare(&stmt, "SELECT COUNT(*) FROM playlist");
+	sqlite3_step(stmt);
 
 	return sqlite3_column_int(stmt, 0);
 }
 
 TrackId playlist_track(int row)
 {
-	int rc;
 	static sqlite3_stmt *stmt;
-	prepare( &stmt, "SELECT track_id FROM playlist WHERE id=?1");
 
-	sqlite3_bind_int( stmt, 1, row );
-
-	rc = sqlite3_step(stmt);
+	prepare(&stmt, "SELECT track_id FROM playlist WHERE id=?1");
+	sqlite3_bind_int(stmt, 1, row);
+	sqlite3_step(stmt);
 
 	return sqlite3_column_int(stmt, 0);
 }
@@ -338,14 +335,14 @@ void *track_free( struct ScuepTrack *track )
 {
 	if(!track) return NULL;
 
-	if (track->uri)      free(track->uri);
-	if (track->path)     free(track->path);
-	if (track->dirname)  free(track->dirname);
-	if (track->basename) free(track->basename);
+	if (track->uri)      free((char*)track->uri);
+	if (track->path)     free((char*)track->path);
+	if (track->dirname)  free((char*)track->dirname);
+	if (track->basename) free((char*)track->basename);
 
-	if (track->title)    free(track->title);
-	if (track->artist)   free(track->artist);
-	if (track->album)    free(track->album);
+	if (track->title)    free((char*)track->title);
+	if (track->artist)   free((char*)track->artist);
+	if (track->album)    free((char*)track->album);
 
 	free(track);
 
@@ -422,13 +419,13 @@ struct ScuepTrack *track_load( int id )
 	track->artist = calloc( sqlite3_column_bytes(stmt_artist, 0)+1, 1 );
 	track->album  = calloc( sqlite3_column_bytes(stmt_album,  0)+1, 1 );
 
-	strcpy(track->artist, artist);
-	strcpy(track->album,  album);
+	strcpy((char*)track->artist, artist);
+	strcpy((char*)track->album,  album);
 
-	char *uripath = path_from_uri(track->uri);
-	track->dirname  = scuep_dirname(uripath);
+	char *uripath  = path_from_uri((char*)track->uri);
+	track->dirname = scuep_dirname(uripath);
 
-	track->path = scuep_strcat(scuep_strdup(track->dirname), track->basename );
+	track->path = scuep_strcat(scuep_strdup(track->dirname), (char*)track->basename);
 	free(uripath);
 	return track;
 

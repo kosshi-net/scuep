@@ -478,7 +478,7 @@ void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
 		mvprintw( row, col+wcw, "%.*s", w-wcw, ".....");
 }
 
-static uint32_t rcount = 0;
+
 
 void draw_carousel(void)
 {
@@ -490,7 +490,7 @@ void draw_carousel(void)
 
 	int items = playlist_count();
 	int center = MIN( term_rows/2, this.cursor+layout.carousel[0] );
-	int row;
+	int row = 0;
 
 	for (int i = this.cursor-center; i < items; i++) {
 

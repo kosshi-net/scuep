@@ -6,16 +6,16 @@
 typedef int TrackId;
 
 struct ScuepTrack {
-	char *uri;
+	const char *uri;
 
-	char *path;
+	const char *path;
 
-	char *basename;
-	char *dirname;
+	const char *basename;
+	const char *dirname;
 
-	char *title;
-	char *artist;
-	char *album;
+	const char *title;
+	const char *artist;
+	const char *album;
 
 	// In milliseconds
 	// TODO: convert to samples

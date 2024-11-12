@@ -26,7 +26,7 @@ struct DecoderState {
 	AVFormatContext *format;
 	AVStream        *stream;
 
-	AVCodec         *codec;
+	const AVCodec   *codec;
 	AVCodecContext  *codec_ctx;
 	AVPacket        *packet;
 	AVFrame         *frame;
