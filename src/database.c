@@ -23,7 +23,7 @@ static char    *path_database;
 static sqlite3 *db;
 
 sqlite3_stmt **stmt_list[256];
-int	           stmt_list_count = 0;
+int            stmt_list_count = 0;
 
 
 /*
@@ -480,14 +480,14 @@ int track_store( struct ScuepTrack *track )
 
 	stmt=stmt_ins_track;
 	rc=(sqlite3_bind_text(stmt, k++, track->uri,      -1, NULL)
-	||	sqlite3_bind_text(stmt, k++, track->basename, -1, NULL)
-	||	sqlite3_bind_text(stmt, k++, track->title,    -1, NULL)
-	||	sqlite3_bind_int (stmt, k++, artist_id)
-	||	sqlite3_bind_int (stmt, k++, album_id)
-	||	sqlite3_bind_int (stmt, k++, track->start)
-	||	sqlite3_bind_int (stmt, k++, track->length)
-	||	sqlite3_bind_int (stmt, k++, track->chapter)
-	||	sqlite3_bind_int (stmt, k++, track->mask)
+	||  sqlite3_bind_text(stmt, k++, track->basename, -1, NULL)
+	||  sqlite3_bind_text(stmt, k++, track->title,    -1, NULL)
+	||  sqlite3_bind_int (stmt, k++, artist_id)
+	||  sqlite3_bind_int (stmt, k++, album_id)
+	||  sqlite3_bind_int (stmt, k++, track->start)
+	||  sqlite3_bind_int (stmt, k++, track->length)
+	||  sqlite3_bind_int (stmt, k++, track->chapter)
+	||  sqlite3_bind_int (stmt, k++, track->mask)
 	);
 	if(rc != SQLITE_OK) goto error;
 

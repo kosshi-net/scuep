@@ -219,7 +219,7 @@ void load_playlist(char *playlist)
 	char clip[4096];
 	char path[MAX_PATH_LEN];
 
-	char 		*head = playlist;
+	char        *head = playlist;
 	const char  *tail = playlist;
 
 	for (int i = 0; ; ++i) {
@@ -285,9 +285,9 @@ void load_playlist(char *playlist)
 			cue_cd = cue_parse_string( string + scuep_bom_length(string) );
 			free(string);
 
-			Track 	*cue_track  = cd_get_track( cue_cd, track.chapter );
-			Cdtext 	*cdtext     = cd_get_cdtext(cue_cd);
-			Cdtext 	*tracktext  = track_get_cdtext(cue_track);
+			Track  *cue_track  = cd_get_track( cue_cd, track.chapter );
+			Cdtext *cdtext     = cd_get_cdtext(cue_cd);
+			Cdtext *tracktext  = track_get_cdtext(cue_track);
 
 			track.album  = cdtext_get( PTI_TITLE, cdtext );
 			track.artist = cdtext_get( PTI_PERFORMER, tracktext );
@@ -327,7 +327,7 @@ void load_playlist(char *playlist)
 
 			track.start = 0;
 			track.length = taglib_audioproperties_length( tl_prop ) * 1000;
-			track.chapter 	 = -1;
+			track.chapter = -1;
 		}
 
 		if(!track.album)  track.album = "";

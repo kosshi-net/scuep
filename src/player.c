@@ -209,8 +209,8 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 	this->frames      = this->period * 215;
 
 	if (this->channels    != param->ch_layout.nb_channels
-	||	this->sample_rate != param->sample_rate
-	||	this->format      != param->format
+	||  this->sample_rate != param->sample_rate
+	||  this->format      != param->format
 	// ??? ||  this->pause       == true
 	){
 		if (!flush) {

@@ -18,8 +18,8 @@ void debug_quit_decoder(void);
 /* Structures */
 
 struct DecoderState {
-	thrd_t 			thread;
-	int 			thread_run;
+	thrd_t          thread;
+	int             thread_run;
 
 	struct ScuepTrack *track;
 

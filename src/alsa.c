@@ -20,7 +20,7 @@ static thrd_t thread;
 static int    thread_run = 0;
 
 /* A period of silence */
-static uint8_t *silence = NULL; 
+static uint8_t *silence = NULL;
 
 snd_pcm_format_t format_av2alsa(enum AVSampleFormat f)
 {
@@ -111,7 +111,7 @@ int alsa_loop(void*arg)
 
 	while (thread_run){
 
-		if( player->tail.stream_changed != player->head.stream_changed 
+		if( player->tail.stream_changed != player->head.stream_changed
 		&&  player->tail.total          >= player->head.stream_changed
 		){
 			player->tail.track_id       = player->head.track_id;

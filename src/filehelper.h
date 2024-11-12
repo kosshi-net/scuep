@@ -10,8 +10,8 @@
 // Check for it and return the length
 int scuep_bom_length(char *string){
 	if( (unsigned char)string[0] == 0xEF
-	&&	(unsigned char)string[1] == 0xBB
-	&&	(unsigned char)string[2] == 0xBF
+	&&  (unsigned char)string[1] == 0xBB
+	&&  (unsigned char)string[2] == 0xBF
 	) return 3;
 	return 0;
 }
