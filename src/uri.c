@@ -19,11 +19,11 @@ char *path_from_uri(char*uri)
 		for (i=uri_len; uri[i] != '/'; i--);
 
 		memcpy(buffer, uri+pre_len, i-pre_len);
-		
+
 	} else {
 		strcpy(buffer, uri);
 	}
-	
+
 	return buffer;
 }
 

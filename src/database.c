@@ -31,9 +31,9 @@ int	           stmt_list_count = 0;
  * Error handling
  * Optimize multi-stmt queries to one (im dumb)
  */
-	
-	
-/*  
+
+
+/*
  * Convenience function. Compiles SQL if not already, otherwise resets stmt.
  */
 int prepare (sqlite3_stmt **stmt, const char *sql)
@@ -49,11 +49,11 @@ int prepare (sqlite3_stmt **stmt, const char *sql)
 		stmt_list[stmt_list_count++] = stmt;
 		scuep_logf("Prepared %s\n", sql);
 		return rc;
-	} 
-	
+	}
+
 	scuep_logf("During statement: %s", sql);
 	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
-	
+
 	return rc;
 }
 
@@ -74,14 +74,14 @@ int db_initialize( char* _path_database )
 
 	if (db_check())
 		return db_reset();
-	
+
 	if (db_prepare())
 		return 1;
 
 	return 0;
 }
 
-int db_terminate()
+int db_terminate(void)
 {
 	db_stmt_finalize_all();
 	sqlite3_close(db);
@@ -89,18 +89,21 @@ int db_terminate()
 	return 0;
 }
 
-int transaction_begin(){
+int transaction_begin(void)
+{
 	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
 	return 0;
 }
-int transaction_end(){
+
+int transaction_end(void)
+{
 	sqlite3_exec(db, "END TRANSACTION", NULL, NULL, NULL);
 	return 0;
 }
 
 
-int db_stmt_finalize_all(){
-
+int db_stmt_finalize_all(void)
+{
 	for (int i = 0; i < stmt_list_count; i++) {
 		sqlite3_finalize( *stmt_list[i] );
 		*stmt_list[i] = NULL;
@@ -113,13 +116,13 @@ int db_stmt_finalize_all(){
 
 
 /* Check if database is valid and version is OK */
-int db_check()
+int db_check(void)
 {
 	int ver = db_intvar_load("version");
 	return (ver != SCUEP_FORMAT_VERSION);
 };
 
-int db_reset()
+int db_reset(void)
 {
 	scuep_logf("Database reset\n");
 
@@ -134,20 +137,20 @@ int db_reset()
 	sql_schema_sql[sql_schema_sql_len-1] = 0;
 
 	char *errmsg = NULL;
-	rc = sqlite3_exec( 
+	rc = sqlite3_exec(
 		db,
 		(char*)sql_schema_sql,
 		NULL,
 		NULL,
 		&errmsg
 	);
-	
+
 	if(errmsg){
 		fprintf(stderr, "Reset failure, %s\n", errmsg);
 		sqlite3_free(errmsg);
 		return 1;
 	}
-	
+
 	if (db_prepare())
 		return 1;
 
@@ -158,22 +161,22 @@ int db_reset()
 
 }
 
-int db_prepare()
+int db_prepare(void)
 {
-	
+
 /*
-	if (sqlite3_prepare_v2(db, 
+	if (sqlite3_prepare_v2(db,
 		"SELECT id FROM tracks WHERE uri=?1",
 		-1, &stmt_track_id_by_url, 0
 	) !=SQLITE_OK) goto prepare_error;
 */
 
 	// TEST CODE HERE
-	
+
 	if (0) goto error;
 
 	return 0;
-	
+
 	error:
 	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
 	return 1;
@@ -186,13 +189,13 @@ int db_intvar_load (const char *key)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare(&stmt, 
+	rc = prepare(&stmt,
 		"SELECT value FROM variables WHERE key=?1;"
 	);
 	if (rc != SQLITE_OK) goto error;
 
 	rc = sqlite3_bind_text(stmt, 1, key, -1, NULL);
-	rc = sqlite3_step(stmt);                 
+	rc = sqlite3_step(stmt);
 	if (rc != SQLITE_ROW) goto error;
 
 	int val = sqlite3_column_int (stmt, 0);
@@ -208,14 +211,14 @@ int db_intvar_store (const char *key, int val)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare(&stmt, 
+	rc = prepare(&stmt,
 		"REPLACE INTO variables (key, value) VALUES (?1, ?2);"
 	);
 	if(rc != SQLITE_OK) goto error;
 
 	sqlite3_bind_text(stmt, 1, key, -1, NULL);
 	sqlite3_bind_int( stmt, 2, val);
-	
+
 	if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
 
 	return 0;
@@ -227,18 +230,17 @@ int db_intvar_store (const char *key, int val)
 }
 
 
-int playlist_clear()
+int playlist_clear(void)
 {
-	int rc = sqlite3_exec( 
+	int rc = sqlite3_exec(
 		db,
 		"DELETE FROM playlist",
 		NULL,
 		NULL,
 		NULL // TODO add errmsg
 	);
-	
-	return (rc != SQLITE_OK );
 
+	return (rc != SQLITE_OK );
 }
 
 
@@ -247,7 +249,7 @@ int playlist_count(void)
 	int rc;
 	static sqlite3_stmt *stmt;
 	prepare( &stmt, "SELECT COUNT(*) FROM playlist");
-	
+
 	rc = sqlite3_step(stmt);
 
 	return sqlite3_column_int(stmt, 0);
@@ -260,7 +262,7 @@ TrackId playlist_track(int row)
 	prepare( &stmt, "SELECT track_id FROM playlist WHERE id=?1");
 
 	sqlite3_bind_int( stmt, 1, row );
-	
+
 	rc = sqlite3_step(stmt);
 
 	return sqlite3_column_int(stmt, 0);
@@ -272,13 +274,13 @@ int playlist_push( TrackId id )
 	int rc;
 	static sqlite3_stmt *stmt;
 	rc = prepare(&stmt, "INSERT INTO playlist(track_id) VALUES (?1)");
-	
+
 	rc = sqlite3_bind_int(stmt, 1, id);
 
 	rc = sqlite3_step(stmt);
 
 	if (rc != SQLITE_DONE) goto error;
-		
+
 	return 0;
 	error:
 	return -1;
@@ -291,7 +293,7 @@ TrackId track_by_uri( const char* uri )
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare(&stmt, 
+	rc = prepare(&stmt,
 		"SELECT id FROM tracks WHERE uri=?1"
 	);
 	rc = sqlite3_bind_text(stmt, 1, uri, -1, NULL );
@@ -310,10 +312,10 @@ TrackId track_by_uri( const char* uri )
 }
 
 
-int insert_ignore_select( 
-	sqlite3_stmt *ins, 
-	sqlite3_stmt *sel, 
-	const char *val 
+int insert_ignore_select(
+	sqlite3_stmt *ins,
+	sqlite3_stmt *sel,
+	const char *val
 ){
 	int rc;
 	rc=(sqlite3_bind_text(ins, 1, val, -1, NULL )
@@ -332,7 +334,7 @@ int insert_ignore_select(
 	return -1;
 }
 
-void *track_free( struct ScuepTrack*track )
+void *track_free( struct ScuepTrack *track )
 {
 	if(!track) return NULL;
 
@@ -350,7 +352,7 @@ void *track_free( struct ScuepTrack*track )
 	return NULL;
 }
 
-struct ScuepTrack *track_load ( int id )
+struct ScuepTrack *track_load( int id )
 {
 	int rc=0;
 	static sqlite3_stmt *stmt;
@@ -402,7 +404,7 @@ struct ScuepTrack *track_load ( int id )
 	track->length = sqlite3_column_int(stmt, 5);
 	track->chapter= sqlite3_column_int(stmt, 6);
 	track->mask   = sqlite3_column_int(stmt, 7);
-	
+
 	int artist_id = sqlite3_column_int( stmt, 2 );
 	int album_id  = sqlite3_column_int( stmt, 3 );
 
@@ -413,19 +415,19 @@ struct ScuepTrack *track_load ( int id )
 	if (rc != SQLITE_ROW) goto error;
 	rc=sqlite3_step(stmt_album);
 	if (rc != SQLITE_ROW) goto error;
-	
+
 	const char *artist = (const char*)sqlite3_column_text( stmt_artist, 0 );
 	const char *album  = (const char*)sqlite3_column_text( stmt_album,  0 );
 
 	track->artist = calloc( sqlite3_column_bytes(stmt_artist, 0)+1, 1 );
 	track->album  = calloc( sqlite3_column_bytes(stmt_album,  0)+1, 1 );
-	
+
 	strcpy(track->artist, artist);
 	strcpy(track->album,  album);
 
 	char *uripath = path_from_uri(track->uri);
 	track->dirname  = scuep_dirname(uripath);
-	
+
 	track->path = scuep_strcat(scuep_strdup(track->dirname), track->basename );
 	free(uripath);
 	return track;
@@ -436,7 +438,7 @@ struct ScuepTrack *track_load ( int id )
 }
 
 
-int track_store( struct ScuepTrack*track )
+int track_store( struct ScuepTrack *track )
 {
 	static sqlite3_stmt *stmt_ins_track;
 
@@ -445,25 +447,25 @@ int track_store( struct ScuepTrack*track )
 	static sqlite3_stmt *stmt_ins_album;
 	static sqlite3_stmt *stmt_sel_album;
 
-	sqlite3_stmt *stmt; 
+	sqlite3_stmt *stmt;
 
 	prepare( &stmt_ins_artist, "INSERT OR IGNORE INTO artists(name) VALUES (?1)");
 	prepare( &stmt_sel_artist, "SELECT id FROM artists WHERE name=?1" );
 	prepare( &stmt_ins_album,  "INSERT OR IGNORE INTO albums(name) VALUES (?1)");
 	prepare( &stmt_sel_album,  "SELECT id FROM albums  WHERE name=?1" );
-	
+
 	prepare( &stmt_ins_track, (char*)sql_insert_track_sql );
 
 	int artist_id = -1;
 	int album_id  = -1;
 
 
-	artist_id = insert_ignore_select( 
+	artist_id = insert_ignore_select(
 		stmt_ins_artist,
 		stmt_sel_artist,
 		track->  artist
 	);
-	album_id = insert_ignore_select( 
+	album_id = insert_ignore_select(
 		stmt_ins_album,
 		stmt_sel_album,
 		track->  album
@@ -488,7 +490,7 @@ int track_store( struct ScuepTrack*track )
 	||	sqlite3_bind_int (stmt, k++, track->mask)
 	);
 	if(rc != SQLITE_OK) goto error;
-	
+
 	rc = sqlite3_step( stmt );
 	if(rc != SQLITE_DONE) goto error;
 
@@ -497,7 +499,5 @@ int track_store( struct ScuepTrack*track )
 	error:
 	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
 	return -1;
-
-
 }
 

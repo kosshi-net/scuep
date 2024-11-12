@@ -10,8 +10,8 @@
 
 /* Gets the count of tracks in a .cue file and prints urls */
 
-int main( int argc, char **argv ){
-
+int main(int argc, char **argv)
+{
 	if (argc != 2) {
 		printf("Usage: %s path.cue '\n", argv[0]);
 		return 1;

@@ -3,22 +3,20 @@
 
 #include <stdint.h>
 
-
-
 typedef int TrackId;
 
 struct ScuepTrack {
-	char *uri; 
+	char *uri;
 
 	char *path;
 
-	char *basename; 
+	char *basename;
 	char *dirname;
 
 	char *title;
 	char *artist;
 	char *album;
-	
+
 	// In milliseconds
 	// TODO: convert to samples
 	int32_t start;
@@ -40,15 +38,13 @@ int track_store( struct ScuepTrack *);
 // Always returns NULL
 void *track_free(struct ScuepTrack *);
 
-
-TrackId track_by_uri( const char* );
-
+TrackId track_by_uri(const char*);
 
 
-int  db_initialize( char* );
-int  db_terminate();
+int  db_initialize(char*);
+int  db_terminate(void);
 
-int  db_reset( void );
+int  db_reset(void);
 
 int  db_intvar_load  (const char *key);
 int  db_intvar_store (const char *key, int val);
@@ -62,7 +58,5 @@ int     playlist_count(void);
 int     playlist_clear(void);
 int     playlist_push (TrackId);
 TrackId playlist_track(int);
-
-
 
 #endif

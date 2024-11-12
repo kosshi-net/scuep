@@ -13,7 +13,7 @@
 
 /* Temporary debug stuff */
 
-void debug_quit_decoder();
+void debug_quit_decoder(void);
 
 /* Structures */
 
@@ -35,26 +35,26 @@ struct DecoderState {
 
 
 struct PlayerState {
-	
+
 	_Atomic bool pause;
 
 	uint8_t *data;
 	size_t size;
 
-	uint32_t channels; 
-	uint32_t sample_rate; 
-	uint32_t period; 
-	uint32_t frames; 
+	uint32_t channels;
+	uint32_t sample_rate;
+	uint32_t period;
+	uint32_t frames;
 
 	uint32_t sizeof_frame;
 	uint32_t sizeof_sample;
 
 	TrackId  track_id; /* TODO Will be removed? */
 
-	// Atomics accessed locklessly, make sure value changes mid-function are 
-	// not an issue, eg sample and cache the values. Make sure to do full 
-	// writes. 
-	
+	// Atomics accessed locklessly, make sure value changes mid-function are
+	// not an issue, eg sample and cache the values. Make sure to do full
+	// writes.
+
 	struct {
 		TrackId  track_id;
 
@@ -62,7 +62,7 @@ struct PlayerState {
 		_Atomic uint64_t total;         // Total frames decoded
 		_Atomic bool     done;
 
-		_Atomic uint64_t stream_changed; 
+		_Atomic uint64_t stream_changed;
 		_Atomic uint64_t stream_offset;
 
 	} head;
@@ -70,11 +70,11 @@ struct PlayerState {
 	struct {
 		TrackId  track_id;
 
-		_Atomic uint64_t ring;    
+		_Atomic uint64_t ring;
 		_Atomic uint64_t total;          // Total frames played
 		_Atomic bool     done;
 
-		_Atomic uint64_t stream_changed; 
+		_Atomic uint64_t stream_changed;
 		_Atomic uint64_t stream_offset;
 	} tail;
 
@@ -87,8 +87,8 @@ struct PlayerState {
 
 };
 
-// Not necessary to call. 
-void player_init();
+// Not necessary to call.
+void player_init(void);
 
 int      player_seek(float);
 int      player_seek_relative(float);
@@ -96,21 +96,21 @@ int      player_seek_relative(float);
 float    player_position_seconds(void);
 float    player_duration_seconds(void);
 
-int player_toggle();
-int player_play();
-int player_pause();
-int player_stop();
+int player_toggle(void);
+int player_play(void);
+int player_pause(void);
+int player_stop(void);
 
-// PlayerInfo is the public state. 
+// PlayerInfo is the public state.
 struct PlayerInfo {
 	// When unitialized (stopped), player is NULL. All values are invalid.
 	// You may access the struct at your own risk for additional information.
-	struct PlayerState *player;          
+	struct PlayerState *player;
 
 	// Pause state
-	bool   	            paused;          
+	bool   	            paused;
 
-	// Currently playing track. Decoder may be decoding a different one. 
+	// Currently playing track. Decoder may be decoding a different one.
 	TrackId             track_id;
 
 	// In seconds
@@ -118,11 +118,11 @@ struct PlayerInfo {
 	float               progress;
 
 	bool next_available; /* TODO Will be removed? */
-	
+
 };
 
 /* Do not free or edit returned struct. Not thread safe. */
-const struct PlayerInfo *player_get_info();
+const struct PlayerInfo *player_get_info(void);
 
 int player_load(TrackId);
 

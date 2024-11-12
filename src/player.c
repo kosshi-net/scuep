@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include <threads.h> 
+#include <threads.h>
 
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
@@ -38,6 +38,7 @@ static struct PlayerInfo   info;
 static struct {
 	bool decoder_quit;
 } debug;
+
 void debug_quit_decoder()
 {
 	debug.decoder_quit = !debug.decoder_quit;
@@ -46,14 +47,14 @@ void debug_quit_decoder()
 
 /* Function impl */
 
-struct PlayerState *_get_playerstate()
+struct PlayerState *_get_playerstate(void)
 {
 	return player;
 }
 
 const struct PlayerInfo *player_get_info(void)
 {
-	info.player = player; 
+	info.player = player;
 
 	if (info.player == NULL) return &info;
 
@@ -65,7 +66,7 @@ const struct PlayerInfo *player_get_info(void)
 
 	info.next_available = false;
 
-	if (player->head.done 
+	if (player->head.done
 	&&  player->head.total == player->tail.total
 	) {
 		info.next_available = true;
@@ -74,7 +75,8 @@ const struct PlayerInfo *player_get_info(void)
 	return &info;
 }
 
-void print_averr(int err){
+void print_averr(int err)
+{
 	char errstr[512];
 	av_make_error_string(errstr, 512, err);
 	scuep_logf("AVERR %i: %s\n", err, errstr);
@@ -86,26 +88,32 @@ void print_averr(int err){
  * In struct ScuepTrack: milliseconds as integer
  * In between: as sample counter
  * In FFMPEG: Whatever it feels like
- * 
+ *
  * Conversion from samples to ffmpeg's timebase is nice with av_rescale_q,
  * should scueptrack timestamps be samples as well?
  */
 
-void player_init(void){
+void player_init(void)
+{
 	if (!player) player = calloc(sizeof(struct PlayerState), 1);
 }
 
-int player_play(void){
+int player_play(void)
+{
 	if (!player) return 1;
 	player->pause = 0;
 	return 0;
 }
-int player_pause(void){
+
+int player_pause(void)
+{
 	if (!player) return 1;
 	player->pause = 1;
 	return 0;
 }
-int player_toggle(void){
+
+int player_toggle(void)
+{
 	if (!player) return 1;
 	player->pause = !player->pause;
 	return 0;
@@ -151,10 +159,10 @@ float player_position_seconds(void)
 {
 	struct PlayerState *this = player;
 	if (!this) return 0.0f;
-	
+
 	float pos = this->tail.total   -
-	            this->tail.stream_changed  + 
-	            this->tail.stream_offset; 
+	            this->tail.stream_changed  +
+	            this->tail.stream_offset;
 	return pos / (float) this->sample_rate;
 }
 
@@ -187,23 +195,23 @@ int player_stop(void)
 	}
 	free(player);
 
-	player = NULL; 
+	player = NULL;
 
 	return 0;
 }
 
 
-int player_reconfig( AVCodecParameters *param, bool flush )
+int player_reconfig(AVCodecParameters *param, bool flush)
 {
 	struct PlayerState *this = player;
 
 	this->period      = 1024;
 	this->frames      = this->period * 215;
-	
+
 	if (this->channels    != param->ch_layout.nb_channels
 	||	this->sample_rate != param->sample_rate
 	||	this->format      != param->format
-	// ??? ||  this->pause       == true  
+	// ??? ||  this->pause       == true
 	){
 		if (!flush) {
 			scuep_logf("Could not soft reconfig:\n");
@@ -220,7 +228,7 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->channels    = param->ch_layout.nb_channels;
 		this->sample_rate = param->sample_rate;
 		this->format      = param->format;
-		
+
 		this->sizeof_sample = av_get_bytes_per_sample(param->format);
 		this->sizeof_frame  = this->sizeof_sample * this->channels;
 		this->size          = this->frames * this->sizeof_frame;
@@ -235,9 +243,9 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 		this->head.total = 0;
 		this->tail.total = 0;
 	} else {
-		if (flush 
+		if (flush
 		 && this->head.total > this->tail.total
-		) { 
+		) {
 			this->head.total = this->tail.total + this->period;
 			this->head.ring  = this->tail.ring  + this->period;
 			this->head.ring %= this->frames;
@@ -247,17 +255,16 @@ int player_reconfig( AVCodecParameters *param, bool flush )
 
 	scuep_logf("Buffer time: %f seconds\n", this->frames / (float)param->sample_rate);
 
-	
 	return 0;
 }
 
-void decoder_free()
+void decoder_free(void)
 {
 	if (!player) return;
 
 	decoder_stop();
 	struct DecoderState *this = &player->av;
-	
+
 	if (this->format)    avformat_close_input(&this->format);
 	// AVCodec is freed by format?
 	if (this->codec_ctx) avcodec_free_context(&this->codec_ctx);
@@ -275,7 +282,7 @@ int decoder_load(TrackId track_id, float seek)
 	scuep_logf("Decoder load %i seek %f\n", track_id, seek);
 	struct DecoderState *this = &player->av;
 	int ret = 0;
-	
+
 	decoder_free();
 
 	player->track_id = track_id;
@@ -303,7 +310,7 @@ int decoder_load(TrackId track_id, float seek)
 
 	scuep_logf("Track has %i stream(s)\n", this->format->nb_streams);
     int stream_index = -1;
-    for (int i = 0; i < this->format->nb_streams; i++) 
+    for (int i = 0; i < this->format->nb_streams; i++)
 	{
 		enum AVMediaType type = this->format->streams[i]->codecpar->codec_type;
 
@@ -319,7 +326,7 @@ int decoder_load(TrackId track_id, float seek)
 
 	this->stream = this->format->streams[stream_index];
 
-	AVCodecParameters *param = this->stream->codecpar; 
+	AVCodecParameters *param = this->stream->codecpar;
 
 	/*****************************
 	 * SEEK & INIT FFMPEG DECODE *
@@ -343,13 +350,13 @@ int decoder_load(TrackId track_id, float seek)
 	int __length = track->length  * (sample_rate/1000.0f) - __seek;
 	scuep_logf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
 	scuep_logf("Period mod: %i\n", __length % 1024);
-	
+
 	int64_t seek_to = av_rescale_q(
-			__start, 
+			__start,
 			sample_scale,
 			this->stream->time_base
 		);
-	
+
 	player->head.stream_offset = __seek;
 
 	ret = av_seek_frame( this->format, stream_index, seek_to, AVSEEK_FLAG_BACKWARD );
@@ -360,7 +367,7 @@ int decoder_load(TrackId track_id, float seek)
 
 	ret = avcodec_parameters_to_context( this->codec_ctx, param );
 	if (ret<0) goto error;
-	
+
 	ret = avcodec_open2(this->codec_ctx, this->codec, NULL);
 	if (ret<0) goto error;
 
@@ -374,19 +381,19 @@ int decoder_load(TrackId track_id, float seek)
 		scuep_logf("Channel count of %i is not yet supported", channels);
 		goto error;
 	}
-	
+
 	{ // Print info about codecs and stuff
 		const char *format_str = av_get_sample_fmt_name(param->format);
-		scuep_logf( "%ihz %ic %s (%ib) %s\n", 
-				param->sample_rate, 
+		scuep_logf( "%ihz %ic %s (%ib) %s\n",
+				param->sample_rate,
 				channels,
-				format_str, 
-				sizeof_sample, 
-				this->codec->long_name 
+				format_str,
+				sizeof_sample,
+				this->codec->long_name
 			);
 		scuep_logf("Timebase: %i / %i\n", this->stream->time_base.den, this->stream->time_base.num);
 	}
-	
+
 	/**************
 	 * OPEN AUDIO *
 	 **************/
@@ -407,14 +414,14 @@ error:
 	return -1;
 }
 
-void decoder_start()
+void decoder_start(void)
 {
 	struct DecoderState *this  = &player->av;
 	if (!this->thread_run)
 		thrd_create( &this->thread, &decoder_loop, NULL );
 }
 
-void decoder_stop()
+void decoder_stop(void)
 {
 	struct DecoderState *this  = &player->av;
 	if (this->thread_run) {
@@ -430,10 +437,10 @@ int decoder_loop(void*arg)
 	this->thread_run = 1;
 	struct ScuepTrack   *track = this->track;
 	int ret = 0;
-	
+
 	scuep_logf("Decode thread started\n");
 
-	AVCodecParameters *param = this->stream->codecpar; 
+	AVCodecParameters *param = this->stream->codecpar;
 	int sample_rate = param->sample_rate;
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
 	int __start  = track->start   * (sample_rate*0.001) ;
@@ -445,7 +452,7 @@ int decoder_loop(void*arg)
 		if (ret < 0) goto error;
 
 		if (this->packet->stream_index != this->stream->index) continue;
-		
+
 		ret = avcodec_send_packet( this->codec_ctx, this->packet );
 		if (ret < 0) {
 			scuep_logf("Send broke! %i\n", ret);
@@ -458,13 +465,13 @@ int decoder_loop(void*arg)
 			ret = avcodec_receive_frame( this->codec_ctx, this->frame);
 
 			int64_t sample_pos = av_rescale_q(
-					this->frame->pts, 
-					this->stream->time_base, 
-					sample_scale 
+					this->frame->pts,
+					this->stream->time_base,
+					sample_scale
 				);
 
 			int64_t samples = this->frame->nb_samples;
-			
+
 			if (sample_pos > __start+__length || debug.decoder_quit) {
 				debug.decoder_quit = false;
 				player->head.done = true;
@@ -477,19 +484,19 @@ int decoder_loop(void*arg)
 			int total     = samples-cut_front-cut_back;
 
 			if (cut_front || cut_back) {
-				scuep_logf("%li, Frame %i+%i front %i, back %i\n", 
+				scuep_logf("%li, Frame %i+%i front %i, back %i\n",
 						sample_pos,
-						this->codec_ctx->frame_num, 
-						this->frame->nb_samples, 
+						this->codec_ctx->frame_num,
+						this->frame->nb_samples,
 						cut_front, total
 				);
 			}
-			
+
 			player_write(this->frame, cut_front, total);
 		}
 	}
 
-finish:	
+finish:
 	player_write_blank_period();
 	av_packet_unref(this->packet);
 	scuep_logf("Decoder quit!\n");
@@ -503,15 +510,15 @@ error:
 	return -1;
 }
 
-void player_write_blank_period()
+void player_write_blank_period(void)
 {
 	struct PlayerState *this = player;
 
 	uint64_t head = this->head.ring;
 	uint64_t next = (head / this->period ) * this->period;
-	
-	if (next == head) return;	
-	
+
+	if (next == head) return;
+
 	next += this->period;
 	uint64_t total = next - head;
 
@@ -529,15 +536,15 @@ void player_write_blank_period()
 	return;
 }
 
-int player_write( 
-	AVFrame *packet, 
-	int cut_front, 
-	int total 
+int player_write(
+	AVFrame *packet,
+	int cut_front,
+	int total
 ){
 	struct PlayerState *this = player;
 
 	int interleaved = !av_sample_fmt_is_planar(packet->format);
-	
+
 	int left = total;
 	int packet_written = cut_front;
 
@@ -548,10 +555,10 @@ int player_write(
 	/* Loop until the whole packet has been written out */
 	while (left != 0 && this->av.thread_run) {
 
-		int available = this->frames - 
-			           (this->head.total - 
+		int available = this->frames -
+			           (this->head.total -
 		                this->tail.total);
-		
+
 		available = MIN(available, this->frames - head);
 		available = MIN(available, left);
 
@@ -562,23 +569,23 @@ int player_write(
 		}
 
 		if (interleaved){
-			memcpy( 
-				this->data      + (head     * this->sizeof_frame), 
-				packet->data[0] + (packet_written * this->sizeof_frame),  
+			memcpy(
+				this->data      + (head     * this->sizeof_frame),
+				packet->data[0] + (packet_written * this->sizeof_frame),
 				available * this->sizeof_frame
 			);
 		} else {
 			/* Nobody should use MP3 anyway */
 			int i = head * this->sizeof_frame;
-			for (int f = 0; f < available; f++)           // Frame
-			for (int c = 0; c < packet->ch_layout.nb_channels; c++)    // Channel
-			for (int b = 0; b < this->sizeof_sample; b++) // Byte
+			for (int f = 0; f < available; f++)                     // Frame
+			for (int c = 0; c < packet->ch_layout.nb_channels; c++) // Channel
+			for (int b = 0; b < this->sizeof_sample; b++)           // Byte
 			{
-				this->data[i++] = packet->data[c][ 
+				this->data[i++] = packet->data[c][
 					(f+packet_written) * this->sizeof_sample + b
 				];
 			}
-		} 
+		}
 
 		head += available;
 		head %= this->frames;

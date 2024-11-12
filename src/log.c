@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -27,9 +26,5 @@ void scuep_logf(const char *format, ...)
 	va_start (args, format);
 	vfprintf(stderr, format, args);
 	va_end (args);
-
 }
-
-
-
 

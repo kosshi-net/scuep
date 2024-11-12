@@ -22,13 +22,14 @@
 /*
  * STRING UTILIES
  *
- * Some stdlib/posix string functions like basename and dirname have issues 
- * like lack of thread safety. Such rewritten functions here can have 
+ * Some stdlib/posix string functions like basename and dirname have issues
+ * like lack of thread safety. Such rewritten functions here can have
  * different interface and behavior.
  */
 
 
-char *scuep_basename(const char*c){
+char *scuep_basename(const char*c)
+{
 	const char *last = c;
 	while (*++c){
 		if (*c == '/') last = c;
@@ -36,20 +37,22 @@ char *scuep_basename(const char*c){
 	return (char*)(last+1);
 }
 
-char *scuep_dirname(const char*path){
+char *scuep_dirname(const char*path)
+{
 	char *dir = scuep_strdup( path );
 	*scuep_basename( dir ) = 0;
 	return dir;
 }
 
-char *scuep_strdup(const char*str){
+char *scuep_strdup(const char*str)
+{
 	char *dup = malloc( strlen(str)+1 );
 	strcpy(dup, str);
 	return dup;
 }
 
-char *scuep_strcat( char *dest, char *src ){
-	
+char *scuep_strcat( char *dest, char *src )
+{
 	size_t dest_len = strlen(dest);
 	size_t src_len  = strlen(src);
 
@@ -79,24 +82,22 @@ wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
 		needle_case[i] = towupper(needle[i]);
 
 	wchar_t *p = wcsstr(haystack_case, needle_case);
-	
+
 	free(haystack_case);
 	free(needle_case);
 
 	if(!p) return p;
-	
+
 	return haystack + (p - haystack_case);
 
-}	
+}
 
-
-
-/* 
+/*
  * Copies characters until total glyph width exceeds max_width. If source text
- * was not cut, returns 0, otherwise returns total glyph width. 
+ * was not cut, returns 0, otherwise returns total glyph width.
  */
-int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width ){
-
+int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width )
+{
 	*width = 0;
 	while(*wc){
 		int gw = wcwidth(*wc);
@@ -109,11 +110,11 @@ int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width
 		*dst++ = *wc++;
 		*width += gw;
 	}
-	
+
 	*dst++ = 0;
 	return 0;
 }
- 
+
 /* Returns true when str starts with pre */
 bool scuep_prefix(const char *pre, const char *str){
     return strncmp(pre, str, strlen(pre)) == 0;
@@ -123,8 +124,8 @@ bool scuep_prefix(const char *pre, const char *str){
  * FILE AND IO UTILITIES
  */
 
-char *read_stdin(){
-	size_t buffer_size = 1024*4; 
+char *read_stdin(void){
+	size_t buffer_size = 1024*4;
 	size_t buffer_index = 0;
 	char *buffer = malloc(buffer_size);
 	int c = 0;
@@ -139,14 +140,15 @@ char *read_stdin(){
 }
 
 
-char *read_file(char *path){
+char *read_file(char *path)
+{
 	FILE *f = fopen(path, "r");
 
 	if(f==NULL) return NULL;
 
 	fseek(f, 0, SEEK_END);
 	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET); 
+	fseek(f, 0, SEEK_SET);
 
 	char *string = calloc(fsize + 16, 1 );
 	if(string==NULL) return NULL;
@@ -158,22 +160,21 @@ char *read_file(char *path){
 }
 
 
-void sleep_ms( uint32_t ms ){
-	// Why is usleep depricated????????!!!!!
-	
+void sleep_ms(uint32_t ms)
+{
 	struct timespec tm;
 
 	tm.tv_sec  =  ms / 1000;
 	tm.tv_nsec = (ms % 1000) * 1000000;
 
 	nanosleep( &tm, &tm );
-
 }
 
-time_t time_ms(){
+time_t time_ms(void)
+{
     struct timespec t;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
-	
+
     return (t.tv_sec*1000L) + (t.tv_nsec/1000000L);
 }
 

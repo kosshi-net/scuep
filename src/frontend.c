@@ -17,34 +17,38 @@
 #include <wchar.h>
 
 
-#include <wchar.h> 
+#include <wchar.h>
 #include <locale.h>
 
 
 /*
- * To avoid unnecessary redraws, use queue_redraw(ELEMENT_*) when relevant 
+ * To avoid unnecessary redraws, use queue_redraw(ELEMENT_*) when relevant
  * state changes happen.
  * */
 
-#define ELEMENT_CLEAR    (1<<0) // Clear all elemenets. Use ELEMENT_ALL to set
+/* Clears all elemenets. Use ELEMENT_ALL to set */
+#define ELEMENT_CLEAR    (1<<0)
 
 #define ELEMENT_PROGRESS (1<<1)
-#define ELEMENT_CAROUSEL (1<<2) 
-#define ELEMENT_PROMPT   (1<<3) 
-#define ELEMENT_DEBUG    (1<<4) 
+#define ELEMENT_CAROUSEL (1<<2)
+#define ELEMENT_PROMPT   (1<<3)
+#define ELEMENT_DEBUG    (1<<4)
 
-#define ELEMENT_PROPERTIES (1<<4) 
+#define ELEMENT_PROPERTIES (1<<4)
 
-#define ELEMENT_ALL      (0xFFFF-ELEMENT_PROPERTIES) // Redraw all elements
+/* Redraws all elements */
+#define ELEMENT_ALL      (0xFFFF-ELEMENT_PROPERTIES)
+
 
 #define KEY_ESCAPE 27
 
 #define LENGTH(arr) (sizeof(arr)/sizeof(*arr))
 
 /* Use via queue_redraw(), not directly */
-static uint32_t elements_dirty = ELEMENT_ALL; 
+static uint32_t elements_dirty = ELEMENT_ALL;
 
-void queue_redraw(int elem){
+void queue_redraw(int elem)
+{
 	elements_dirty |= elem;
 }
 
@@ -102,11 +106,13 @@ static struct {
 	int32_t prompt;
 } layout;
 
-void prompt_set_prefix(char *str){
+void prompt_set_prefix(char *str)
+{
 	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix));
 }
 
-void prompt_set_prefix_w(wchar_t *str){
+void prompt_set_prefix_w(wchar_t *str)
+{
 	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.w));
 }
 
@@ -116,6 +122,7 @@ void prompt_clear_c(void)
 	this.cmd.c_len = 0;
 	scuep_logf("cmd.c cleared\n");
 }
+
 void prompt_clear(void)
 {
 	prompt_clear_c();
@@ -125,10 +132,11 @@ void prompt_clear(void)
 	queue_redraw(ELEMENT_PROMPT);
 }
 
-void command_delete(int32_t pos){
+void command_delete(int32_t pos)
+{
 	if(pos < 0) return;
 	if(pos >= this.cmd.w_len) return;
-	
+
 	for (int i = pos; i < this.cmd.w_len; i++) {
 		this.cmd.w[i] = this.cmd.w[i+1];
 	}
@@ -164,10 +172,9 @@ void prompt_insert(char c)
 
 void input_prompt(int key)
 {
-
 	scuep_logf("%i\n", key);
 	switch (key) {
-		case KEY_ESCAPE: 
+		case KEY_ESCAPE:
 			this.input_mode = MODE_DEFAULT;
 			prompt_set_prefix("");
 			break;
@@ -186,7 +193,7 @@ void input_prompt(int key)
 		case KEY_RIGHT:
 			this.cmd.cursor++;
 			break;
-		
+
 		case KEY_ENTER:
 			this.input_mode = MODE_DEFAULT;
 			break;
@@ -229,8 +236,8 @@ int frontend_initialize(void)
 	FILE* term_in = fopen("/dev/tty", "r");
 
 	screen = newterm(term_type, stdout, term_in);
-	
-	cbreak();              // 
+
+	cbreak();              //
 	noecho();              // input echo
 	curs_set(0);           // Disable cursor
 	keypad(stdscr, TRUE);  // Arrow keys
@@ -247,7 +254,7 @@ int frontend_initialize(void)
 
 	this.playlist_items = playlist_count();
 
-	
+
 	while(!this.should_quit){
 		frontend_tick();
 	}
@@ -291,12 +298,12 @@ int frontend_tick(void)
 
 
 	/*
-	 * TODO: Hotwired Autoplay 
+	 * TODO: Hotwired Autoplay
 	 */
 	struct PlayerState *player = _get_playerstate();
 	if (player) {
-		if (player->head.done 
-		&&  player->head.total - player->tail.total == 0 
+		if (player->head.done
+		&&  player->head.total - player->tail.total == 0
 		&& !player->pause
 		) {
 			frontend_next(1);
@@ -331,7 +338,7 @@ void frontend_next(int32_t num)
 	frontend_play(this.active);
 }
 
-void cursor_lock()
+void cursor_lock(void)
 {
 	this.cursor_locked = true;
 	this.cursor = this.active;
@@ -339,11 +346,10 @@ void cursor_lock()
 }
 
 
-void cursor_free()
+void cursor_free(void)
 {
 	this.cursor_locked = false;
 }
-
 
 
 void input_default(int key)
@@ -386,7 +392,7 @@ void input_default(int key)
 		case 'b':
 			frontend_next(1);
 			break;
-		
+
 		case 'x':
 			player_seek(0);
 			player_play();
@@ -408,7 +414,7 @@ void input_default(int key)
 			this.input_repeat = 0;
 			this.cursor = ( this.playlist_items + this.cursor ) % this.playlist_items;
 			queue_redraw(ELEMENT_CAROUSEL);
-			break;	
+			break;
 		case 'j':
 		case KEY_DOWN:
 			cursor_free();
@@ -419,18 +425,19 @@ void input_default(int key)
 			break;
 		case 'q':
 			this.should_quit = true;
-			break;	
+			break;
 
-		case '1': case '2': case '3': 
-		case '4': case '5': case '6': 
+		case '1': case '2': case '3':
+		case '4': case '5': case '6':
 		case '7': case '8': case '9':
-		case '0': 
+		case '0':
 			this.input_repeat = this.input_repeat*10 + (key-'0');
 			break;
 	}
 }
 
-void input(){
+void input(void)
+{
 	timeout(100);
 	int key = getch();
 
@@ -460,8 +467,8 @@ void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
 {
 	static wchar_t wccut[1024] = {0};
 	uint32_t wcw;
-	int cut = scuep_wcslice( wccut, wctext, w-2, &wcw ); 
-	
+	int cut = scuep_wcslice( wccut, wctext, w-2, &wcw );
+
 	if (flags & ALIGN_RIGHT) {
 		int total = wcw + (w-wcw)*cut;
 		col -= total;
@@ -473,7 +480,7 @@ void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
 
 static uint32_t rcount = 0;
 
-void draw_carousel()
+void draw_carousel(void)
 {
 
 	mvprintw(1, layout.pad[0], "Playlist: %i / %i", this.cursor , this.playlist_items);
@@ -532,7 +539,7 @@ void draw_carousel()
 
 		mbstowcs(wctext, track->title, 1023);
 		carousel_text(row, l, w, wctext, 0);
-		
+
 		track_free(track);
 	}
 
@@ -545,7 +552,7 @@ void draw_carousel()
 
 
 
-void draw_debug()
+void draw_debug(void)
 {
 	struct PlayerState *player = _get_playerstate();
 
@@ -563,19 +570,19 @@ void draw_debug()
 	if(!player){
 		mvprintw(layout.debug+1,0, "%s", "Player uninitialized" );
 	} else {
-		mvprintw(layout.debug+1,0, 
+		mvprintw(layout.debug+1,0,
 			" paused: %i"
 			" done: %i"
 			" decoder: %i"
 			" sndsvr %i"
 			" buffer: %li"
-			,player->pause 
-			,player->head.done 
-			,player->av.thread_run 
+			,player->pause
+			,player->head.done
+			,player->av.thread_run
 			,!!player->sndsvr_close
 			,player->head.total - player->tail.total
 		);
-		mvprintw(layout.debug+2,0, 
+		mvprintw(layout.debug+2,0,
 			"%.02f / %.02f "
 			"head: %li tail: %li",
 			player_position_seconds(),
@@ -583,14 +590,14 @@ void draw_debug()
 			player->head.ring,
 			player->tail.ring
 		);
-		mvprintw(layout.debug+3,0, 
+		mvprintw(layout.debug+3,0,
 			"Input mode: %i, cursor: %i",
 			this.input_mode, this.cmd.cursor
 		);
 	}
 }
 
-void draw_progress()
+void draw_progress(void)
 {
 	float fprogress = player_position_seconds();
 	int progress = round(fprogress);
@@ -620,7 +627,7 @@ void draw_progress()
 		l-=2;
 	}
 
-	
+
 	int32_t pos = floor( (l-r-1) * (fprogress/(float)duration) );
 	pos += r;
 
@@ -633,7 +640,7 @@ void draw_progress()
 	}
 };
 
-void draw_prompt()
+void draw_prompt(void)
 {
 	move(layout.prompt, 0);
 	clrtoeol();

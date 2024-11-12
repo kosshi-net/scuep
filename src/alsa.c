@@ -22,13 +22,13 @@ static int    thread_run = 0;
 /* A period of silence */
 static uint8_t *silence = NULL; 
 
-snd_pcm_format_t format_av2alsa( enum AVSampleFormat f ){
-
+snd_pcm_format_t format_av2alsa(enum AVSampleFormat f)
+{
 	switch(f){
 		case AV_SAMPLE_FMT_FLT:
 		case AV_SAMPLE_FMT_FLTP:
 			return SND_PCM_FORMAT_FLOAT_LE;
-		
+
 		case AV_SAMPLE_FMT_S16:
 		case AV_SAMPLE_FMT_S16P:
 			return SND_PCM_FORMAT_S16_LE;
@@ -50,9 +50,9 @@ int alsa_open(struct PlayerState *_player)
 {
 	int err;
 	player = _player;
-	
+
 	alsa_close();
-	
+
 	silence = calloc(player->period, player->sizeof_frame);
 	snd_pcm_format_t format = format_av2alsa( player->format );
 
@@ -60,7 +60,7 @@ int alsa_open(struct PlayerState *_player)
         scuep_logf("Playback open error: %s\n", snd_strerror(err));
 		return -1;
     }
-	
+
 	if ((err = snd_pcm_set_params(pcm,
 		format,
 		SND_PCM_ACCESS_RW_INTERLEAVED,
@@ -69,11 +69,11 @@ int alsa_open(struct PlayerState *_player)
 		/* soft resample */ 1,
 		/* latency       */ 50000
 		) ) < 0
-	){   
+	){
 		scuep_logf("Playback open error: %s\n", snd_strerror(err));
 		return -1;
     }
-	
+
 	player->sndsvr_close = alsa_close;
 	thrd_create( &thread, &alsa_loop, NULL );
 
@@ -110,7 +110,7 @@ int alsa_loop(void*arg)
 	snd_pcm_prepare(pcm);
 
 	while (thread_run){
-		
+
 		if( player->tail.stream_changed != player->head.stream_changed 
 		&&  player->tail.total          >= player->head.stream_changed
 		){
@@ -124,7 +124,7 @@ int alsa_loop(void*arg)
 		int total = MIN(player->head.total - player->tail.total, player->period);
 
 		if (total < player->period
-		||  player->pause 
+		||  player->pause
 		){
 			snd_pcm_writei(pcm,
 				silence,
@@ -143,7 +143,6 @@ int alsa_loop(void*arg)
 			if (frames < 0) break;
 			total -= frames;
 		}
-		
 
 		if (frames < 0) {
 			// TODO Proper error handling !
@@ -161,7 +160,6 @@ int alsa_loop(void*arg)
 		player->tail.ring = tail;
 
 		player->tail.total += frames;
-
 	}
 
 	snd_pcm_drop(pcm);

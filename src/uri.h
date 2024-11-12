@@ -10,5 +10,4 @@
 
 char *path_from_uri(char*);
 
-
 #endif

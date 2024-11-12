@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// This helper is used to read cue files to memory and to fix some common 
+// This helper is used to read cue files to memory and to fix some common
 // non-syntax issues that prevent libcue from parsing them correctly.
 // Tested with a collection of 6700 cue files.
 
@@ -41,7 +41,7 @@ void scuep_remove_rems(char *string){
 	string[i] = *c; // Null
 }
 
-// Rename this!! Only use for reading cue files! 
+// Rename this!! Only use for reading cue files!
 char *scuep_read_file(char *path){
 	FILE *f = fopen(path, "r");
 
@@ -49,7 +49,7 @@ char *scuep_read_file(char *path){
 
 	fseek(f, 0, SEEK_END);
 	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET); 
+	fseek(f, 0, SEEK_SET);
 
 	char *string = calloc(fsize + 16, 1 );
 	if(string==NULL) return NULL;

@@ -1,16 +1,16 @@
 #include "config.h"
 #include <stdio.h>
 
-#include <taglib/tag_c.h>	
+#include <taglib/tag_c.h>
 #include <libcue/libcue.h>
 #include <sqlite3.h>
 
-#include <wchar.h> 
+#include <wchar.h>
 #include <locale.h>
 #include <fcntl.h>
 
-#include <string.h> 
-#include <stdint.h> 
+#include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <poll.h>
@@ -40,7 +40,7 @@ static void  load_playlist(char *playlist);
 
 static bool ro = 0;
 
-void scuep_exit( const char *error)
+void scuep_exit(const char *error)
 {
 	// Do clean up
 	if (error) {
@@ -59,7 +59,7 @@ enum Flag {
 	flag_debug,
 	flag_stdin
 };
-enum Flag parse_flag( char* str )
+enum Flag parse_flag(char* str)
 {
 	if(strcmp(str, "--help"
 	)==0) return flag_help;
@@ -99,10 +99,11 @@ enum Flag parse_flag( char* str )
 "--ro\n" \
 "    Don't overwrite playlist saved in .config\n" \
 "-i, -\n" \
-"    Read playlist from stdin\n" 
+"    Read playlist from stdin\n"
 
 
-int build_config_paths(){
+int build_config_paths(void)
+{
 	char *cfgroot = getenv("XDG_CONFIG_HOME");
 
 	if (!cfgroot) {
@@ -117,7 +118,7 @@ int build_config_paths(){
 		fprintf(stderr, "%s is not a valid config path\n", cfgroot);
 		return -1;
 	}
-	
+
 	if (access(path_config_folder, W_OK)) {
 		mkdir( path_config_folder, 0700 );
 	}
@@ -139,7 +140,7 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		enum Flag flag = parse_flag(arg);
-		
+
 		switch (flag) {
 			case flag_help:
 				printf("%s", HELP_MESSAGE);
@@ -167,7 +168,7 @@ int main(int argc, char **argv)
 				scuep_logf("Database reset\n");
 				break;
 			default:
-				// Assume its a file
+				/* Assume its a file */
 				input_file = read_file(arg);
 				if (!input_file){
 					scuep_exit("Invalid option or file\nscuep --help");
@@ -177,12 +178,12 @@ int main(int argc, char **argv)
 		}
 	}
 
-	
+
 	if (db_initialize(path_database)) {
 		fprintf(stderr, "Database error\n");
 		return 1;
 	}
-	
+
 	if (input_file) {
 		playlist_clear();
 		load_playlist( input_file );
@@ -206,10 +207,10 @@ int main(int argc, char **argv)
 #ifdef LOAD_PLAYLIST_INCLUDE
 
 /*
- * TODO: 
+ * TODO:
  * Use strdup instead of const disgarding
- * Move to import.c and split  it up 
- * Make it return on error instead of calling exit() 
+ * Move to import.c and split  it up
+ * Make it return on error instead of calling exit()
  */
 void load_playlist(char *playlist)
 {
@@ -222,7 +223,7 @@ void load_playlist(char *playlist)
 	const char  *tail = playlist;
 
 	for (int i = 0; ; ++i) {
-		
+
 		/* Save progress for large scans
 		if( i % 1000 == 0 && i){
 			transaction_end();
@@ -237,16 +238,16 @@ void load_playlist(char *playlist)
 		while( *head && *head != '\n' ) head++;
 		if(*head=='\0') goto finish; // END OF LINE
 		*head = '\0';
-		
+
 		strcpy(clip, tail);
 		const char *uri = tail;
 
-		/* 
+		/*
 		 * Check if URL exists in cache database
 		 * if true, add id and continue
 		 */
 		track_id = track_by_uri(uri);
-		
+
 		scuep_logf("track_id %i\n", track_id);
 
 		if( track_id > -1){
@@ -256,8 +257,7 @@ void load_playlist(char *playlist)
 		}
 
 
-		struct ScuepTrack track;
-		memset(&track, 0, sizeof(struct ScuepTrack));
+		struct ScuepTrack track = {};
 		track.uri = uri;
 
 		if (strncmp(&uri[0], "cue://", 6)  == 0) {
@@ -295,14 +295,14 @@ void load_playlist(char *playlist)
 			//printf("FRAME %li\n", track_get_start(cue_track) );
 			track.start  = track_get_start  (cue_track) / (CD_FRAMERATE*0.001);
 			track.length = track_get_length (cue_track) / (CD_FRAMERATE*0.001);
-						
+
 			track.basename   = track_get_filename(cue_track);
 			track.dirname    = scuep_dirname(path);
 			printf("BASENAME %s\n", track.basename);
 
 		}
-		else{ // Misc file, use taglib
-			
+		else
+		{ // Misc file, use taglib
 			strncpy( path, uri , MAX_PATH_LEN );
 			printf("%s\n", uri);
 
@@ -334,12 +334,12 @@ void load_playlist(char *playlist)
 		if(!track.title)  track.title = "";
 		if(!track.artist) track.artist = "";
 
-		// if metadata failed to load, use filename instead
+		/* If metadata failed to load, use filename instead */
 		if( !track.title[0] )  track.title = scuep_basename(uri);
 		scuep_logf( "%s // %s // %s // %i - %is, #%i\n", \
-			track.title, 
-			track.artist, 
-			track.album, 
+			track.title,
+			track.artist,
+			track.album,
 			track.start,
 			track.length,
 			track.chapter
@@ -349,7 +349,7 @@ void load_playlist(char *playlist)
 		track_store(&track);
 		track_id = track_by_uri(uri);
 		playlist_push( track_id );
-		
+
 		skip:
 		if(cue_cd) {
 			cd_delete(cue_cd);
@@ -367,7 +367,4 @@ finish:
 
 
 #endif
-
-
-
 
