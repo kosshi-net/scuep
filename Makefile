@@ -1,9 +1,8 @@
-
-NCURSES=	`pkg-config --libs --cflags ncursesw`
-LIBCUE=		`pkg-config --libs --cflags libcue`
-ALSA=		`pkg-config --libs --cflags alsa`
-TAGLIB=		`pkg-config --libs --cflags taglib_c`
-SQLITE=		`pkg-config --libs --cflags sqlite3`
+NCURSES=    `pkg-config --libs --cflags ncursesw`
+LIBCUE=     `pkg-config --libs --cflags libcue`
+ALSA=       `pkg-config --libs --cflags alsa`
+TAGLIB=     `pkg-config --libs --cflags taglib_c`
+SQLITE=     `pkg-config --libs --cflags sqlite3`
 AVCODEC=    `pkg-config --libs --cflags libavcodec`
 AVFORMAT=   `pkg-config --libs --cflags libavformat`
 AVUTIL=     `pkg-config --libs --cflags libavutil`
@@ -19,7 +18,7 @@ SRCDIR=src
 OBJDIR=obj
 BINDIR=bin
 
-src_pre = main.c database.c util.c log.c player.c uri.c frontend.c alsa.c 
+src_pre = $(notdir $(wildcard src/*.c))
 obj_pre = $(src_pre:.c=.o)
 
 src = $(addprefix $(SRCDIR)/, $(src_pre) )
@@ -37,8 +36,8 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-bin/scuep-cue-to-urls: src/scuep-cue-to-urls.c src/filehelper.h;
-	$(CC) src/scuep-cue-to-urls.c $(CFLAGS) $(LIBCUE)  -o $(BINDIR)/scuep-cue-to-urls
+bin/scuep-cue-to-urls: src/scuep-cue-to-urls/main.c;
+	$(CC) $^ $(CFLAGS) $(LIBCUE)  -o $(BINDIR)/scuep-cue-to-urls
 
 $(BINDIR)/scuep: $(sql_h) $(obj)
 	$(CC) $^ -ltag -lm $(CFLAGS) $(AVCODEC) $(AVFORMAT) $(AVUTIL) $(NCURSES) $(LIBCUE) $(ALSA) $(TAGLIB) $(SQLITE) -lpthread -g -o $@

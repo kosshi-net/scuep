@@ -1,6 +1,5 @@
-#include "config.h"
-
-#include "filehelper.h"
+#include "../config.h"
+#include "../filehelper.h"
 
 #include <stdio.h>
 #include <stdlib.h>
