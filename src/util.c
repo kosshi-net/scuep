@@ -65,8 +65,8 @@ char *scuep_strcat( char *dest, char *src )
 
 /* Case insensitive widechar substring search
  * Not efficient but works */
-wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle){
-
+wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle)
+{
 	if (!haystack || !*haystack) return 0;
 
 	size_t haystack_len = wcslen(haystack);
@@ -117,7 +117,8 @@ int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width
 }
 
 /* Returns true when str starts with pre */
-bool scuep_prefix(const char *pre, const char *str){
+bool scuep_prefix(const char *pre, const char *str)
+{
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
@@ -125,15 +126,16 @@ bool scuep_prefix(const char *pre, const char *str){
  * FILE AND IO UTILITIES
  */
 
-char *read_stdin(void){
+char *read_stdin(void)
+{
 	size_t buffer_size = 1024*4;
 	size_t buffer_index = 0;
 	char *buffer = malloc(buffer_size);
 	int c = 0;
-	while((c = getchar()) != EOF) {
+	while ((c = getchar()) != EOF) {
 		buffer[buffer_index++] = c;
-		if(buffer_index == buffer_size){
-			buffer_size*=2;
+		if (buffer_index == buffer_size) {
+			buffer_size *= 2;
 			buffer = realloc(buffer, buffer_size);
 		}
 	}
