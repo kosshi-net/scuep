@@ -36,6 +36,7 @@
 
 static char *path_config_folder;
 static char *path_database;
+static char *path_fifo;
 static void  load_playlist(char *playlist);
 
 static bool ro = 0;
@@ -111,8 +112,9 @@ int build_config_paths(void)
 		asprintf( &cfgroot, "%s/.config", home );
 	}
 
-	asprintf(&path_config_folder, "%s/scuep-dev", cfgroot);
+	asprintf(&path_config_folder, "%s/scuep", cfgroot);
 	asprintf(&path_database, "%s/scuep.db", path_config_folder);
+	asprintf(&path_fifo, "%s/fifo", path_config_folder);
 
 	if (access(cfgroot, W_OK)) {
 		fprintf(stderr, "%s is not a valid config path\n", cfgroot);
@@ -193,7 +195,7 @@ int main(int argc, char **argv)
 		input_file = NULL;
 	}
 
-	frontend_initialize();
+	frontend_initialize(path_fifo);
 	frontend_terminate();
 
 	db_terminate();

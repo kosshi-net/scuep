@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-int frontend_initialize(void);
+int frontend_initialize(const char *fifopath);
 int frontend_tick(void);
 int frontend_terminate(void);
 

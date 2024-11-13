@@ -20,6 +20,8 @@
 #include <wchar.h>
 #include <locale.h>
 
+#include <sys/stat.h>
+#include <poll.h>
 
 /*
  * To avoid unnecessary redraws, use queue_redraw(ELEMENT_*) when relevant
@@ -93,6 +95,12 @@ static struct {
 		/* Cursor position in widechar prompt buffer */
 		int32_t cursor;
 	} cmd;
+
+	struct {
+		int fd;
+		struct pollfd fds[1];
+		char buffer[1024];
+	} fifo;
 
 	enum {
 		MODE_DEFAULT,
@@ -234,7 +242,7 @@ void layout_update()
 
 }
 
-int frontend_initialize(void)
+int frontend_initialize(const char *fifopath)
 {
 	const char *term_type = getenv("TERM");
 	FILE* term_in = fopen("/dev/tty", "r");
@@ -258,20 +266,54 @@ int frontend_initialize(void)
 
 	this.playlist_items = playlist_count();
 
+	/* Set up fifo */
+	mkfifo(fifopath, 0666);
+	this.fifo.fd = open(fifopath, O_RDONLY | O_NONBLOCK);
+	this.fifo.fds[0].fd     = this.fifo.fd;
+	this.fifo.fds[0].events = POLLIN;
+	/* Clear fifo in case it's been written into offline */
+	while(read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1) );
 
 	while(!this.should_quit){
 		frontend_tick();
 	}
 
-
 	return 0;
 }
 
+
+void poll_remote(void) {
+	if (poll(this.fifo.fds, 1, 0) < 1) {
+		return;
+	}
+
+	int bytes = read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1);
+	if (bytes < 1) {
+		return;
+	}
+
+	this.fifo.buffer[bytes] = 0;
+
+	char *head = this.fifo.buffer;
+	char *tail = head;
+
+	while (*head) {
+		switch (*head) {
+		case '\n':
+			*head = 0;
+			shell_run(tail);
+			tail = head+1;
+			break;
+		}
+		head++;
+	}
+}
 
 
 int frontend_tick(void)
 {
 	input();
+	poll_remote();
 
 	int _rows, _cols;
 	getmaxyx( stdscr, _rows, _cols );
