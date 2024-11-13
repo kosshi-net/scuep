@@ -4,6 +4,7 @@
 #include "database.h"
 #include "player.h"
 #include "log.h"
+#include "shell.h"
 
 #include "util.h"
 
@@ -15,7 +16,6 @@
 
 #include <string.h>
 #include <wchar.h>
-
 
 #include <wchar.h>
 #include <locale.h>
@@ -77,13 +77,20 @@ static struct {
 	bool    cursor_locked;
 
 	struct {
+		/* Visual prompt label, eg ":" or "/" */
 		wchar_t prefix[512];
 
+		/* UTF-8 input staging buffer, flushed to widechar buffer */
 		uint32_t c_len;
 		char     c[128];
+
+		/* Widechar prompt buffer.
+		 * Assumed UTF-32, treated as grapheme clusters
+		 * TODO: Use libgrapheme perhaps? */
 		uint32_t w_len;
 		wchar_t  w[1024];
 
+		/* Cursor position in widechar prompt buffer */
 		int32_t cursor;
 	} cmd;
 
@@ -108,12 +115,12 @@ static struct {
 
 void prompt_set_prefix(char *str)
 {
-	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix));
+	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
 }
 
 void prompt_set_prefix_w(wchar_t *str)
 {
-	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.w));
+	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
 }
 
 void prompt_clear_c(void)
@@ -194,7 +201,9 @@ void input_prompt(int key)
 			this.cmd.cursor++;
 			break;
 
-		case KEY_ENTER:
+		case KEY_ENTER: /* Keypad enter */
+		case '\n':
+			shell_run_w(this.cmd.w);
 			this.input_mode = MODE_DEFAULT;
 			break;
 
@@ -204,11 +213,6 @@ void input_prompt(int key)
 	}
 	this.cmd.cursor = MIN(MAX(this.cmd.cursor, 0),this.cmd.w_len);
 	queue_redraw(ELEMENT_PROMPT);
-}
-
-void command_run(char*cmd)
-{
-
 }
 
 void layout_update()
@@ -264,7 +268,6 @@ int frontend_initialize(void)
 }
 
 
-void frontend_next(int32_t num);
 
 int frontend_tick(void)
 {
