@@ -31,7 +31,7 @@
 #include "frontend.h"
 
 #define SCUEP_TITLE "scuep"
-#define SCUEP_VERSION_MAJOR 1
+#define SCUEP_VERSION_MAJOR 0
 #define SCUEP_VERSION_MINOR 0
 
 static char *path_config_folder;
@@ -71,6 +71,9 @@ enum Flag parse_flag(char* str)
 	if(strcmp(str, "--readonly"
 	)==0) return flag_ro;
 
+	if(strcmp(str, "--ro"
+	)==0) return flag_ro;
+
 	if(strcmp(str, "--reset"
 	)==0) return flag_reset;
 
@@ -86,22 +89,11 @@ enum Flag parse_flag(char* str)
 	return flag_default;
 }
 
+/* TODO: Placeholder message until there's a better documentation solution */
 #define HELP_MESSAGE \
 "SCUEP - Simple CUE Player\n\n" \
 "The player is in an early development state.\n" \
-"Please visit https://github.com/kosshi-net/scuep for updates and additional\n" \
-"help and usage examples.\n" \
-"--help\n" \
-"    Display help\n" \
-"--version\n" \
-"    Print version\n" \
-"--debug\n" \
-"    Enable logging to stderr. Use with 2>log.txt.\n" \
-"--ro\n" \
-"    Don't overwrite playlist saved in .config\n" \
-"-i, -\n" \
-"    Read playlist from stdin\n"
-
+"Please visit https://github.com/kosshi-net/scuep for documentation."
 
 int build_config_paths(void)
 {
