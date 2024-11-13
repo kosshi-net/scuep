@@ -19,13 +19,13 @@ int main(int argc, char **argv)
 	char *string = scuep_read_file(argv[1]);
 	if (string==NULL) goto error;
 
-	Cd *cd = cue_parse_string( string + scuep_bom_length(string) );
+	Cd *cd = cue_parse_string(string + scuep_bom_length(string));
 	if (cd==NULL) goto error;
 
 	int num_tracks = cd_get_ntrack(cd);
 	if (num_tracks==0) goto error;
 
-	for( int i = 0; i < num_tracks; i++ )
+	for (int i = 0; i < num_tracks; i++)
 		printf("cue://%s/%i\n", argv[1], i+1);
 
 	cd_delete(cd);
