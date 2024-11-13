@@ -282,7 +282,7 @@ int frontend_initialize(const char *fifopath)
 }
 
 
-void poll_remote(void) 
+void poll_remote(void)
 {
 	if (poll(this.fifo.fds, 1, 0) < 1) {
 		return;
