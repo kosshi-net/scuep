@@ -13,6 +13,7 @@ Unimplemented features
 - Search
 - Many legacy commands
 - Selections
+- Volume control
 
 Other issues, bugs, & TODO
 - FFmpeg decodes to native endianess while alsa driver always assumes little-endian
