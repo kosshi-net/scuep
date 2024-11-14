@@ -519,7 +519,8 @@ void input(void)
 }
 
 
-#define ALIGN_RIGHT 1
+#define CAROUSEL_PRINT_ALIGN_RIGHT (1<<0)
+#define CAROUSEL_PRINT_FOCUSED (1<<1)
 void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 {
 	static wchar_t wccut[1024] = {0};
@@ -529,11 +530,16 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 	int cut = scuep_wcsnvslice(wccut, wctext, w-2, LENGTH(wccut), &wcw);
 	wccut_len = wcslen(wccut);
 
-	if (flags & ALIGN_RIGHT) {
+	if (flags & CAROUSEL_PRINT_ALIGN_RIGHT) {
 		uint32_t total = wcw + (w-wcw)*cut;
 		col -= total;
 	}
+
+	if (flags & CAROUSEL_PRINT_FOCUSED) { 
+		attron(COLOR_PAIR(1));
+	}
 	mvprintw(row, col, "%S", wccut);
+	attroff(COLOR_PAIR(1));
 
 	/* Search highlighting */
 	bool hl_cut = false;
@@ -595,6 +601,7 @@ void draw_carousel(void)
 	int row = 0;
 
 	for (int i = this.cursor-center; i < items; i++) {
+		int flags = 0;
 
 		row = i - this.cursor + center;
 
@@ -609,6 +616,7 @@ void draw_carousel(void)
 
 		if (i == this.cursor) {
 			mvprintw( row, 1, "~" );
+			flags |= CAROUSEL_PRINT_FOCUSED;
 		}
 		if (i == this.active) {
 			mvprintw( row, 1, ">" );
@@ -624,7 +632,9 @@ void draw_carousel(void)
 
 		if (w-title_min > album_min) {
 			mbstowcs(wctext, track->album, 1023);
-			carousel_text(row, term_cols - r, album_min, wctext, ALIGN_RIGHT);
+			carousel_text(row, term_cols - r, album_min, wctext,
+				flags | CAROUSEL_PRINT_ALIGN_RIGHT
+			);
 
 			w -= album_min;
 			r += album_min;
@@ -634,13 +644,13 @@ void draw_carousel(void)
 
 			mbstowcs(wctext, track->artist, 1023);
 			r += artist_min;
-			carousel_text(row, term_cols-r, artist_min, wctext, 0);
+			carousel_text(row, term_cols-r, artist_min, wctext, flags);
 			w -= artist_min;
 			w -= 2; /* Leave a gap between title and artist*/
 		}
 
 		mbstowcs(wctext, track->title, 1023);
-		carousel_text(row, l, w, wctext, 0);
+		carousel_text(row, l, w, wctext, flags);
 
 		track_free(track);
 	}
