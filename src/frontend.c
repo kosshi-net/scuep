@@ -262,6 +262,8 @@ void input_prompt(int key)
 				frontend_search(+1);
 			}
 			this.input_mode = MODE_DEFAULT;
+			prompt_set_prefix("");
+			prompt_clear();
 			break;
 
 		default:
