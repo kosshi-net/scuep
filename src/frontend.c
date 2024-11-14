@@ -79,6 +79,11 @@ static struct {
 	bool    cursor_locked;
 
 	struct {
+		char    c[1024];
+		wchar_t w[1024];
+	} search;
+
+	struct {
 		/* Visual prompt label, eg ":" or "/" */
 		wchar_t prefix[512];
 
@@ -185,6 +190,43 @@ void prompt_insert(char c)
 	prompt_clear_c();
 }
 
+
+void frontend_set_search(wchar_t *str)
+{
+	wcsncpy(this.search.w, str, LENGTH(this.search.w)-1);
+	wcstombs(this.search.c, this.search.w, LENGTH(this.search.c)-1);
+}
+
+
+void frontend_search(int dir)
+{
+	char *needle = this.search.c;
+	if (needle[0] == '\0') return;
+
+	for (uint32_t j = 1; j < this.playlist_items; j++) {
+		uint32_t index = this.cursor + dir * j;
+		index = (index+this.playlist_items) % this.playlist_items;
+
+		TrackId trackid = playlist_track(index + 1);
+		struct ScuepTrack *track = track_load(trackid);
+
+		int match = (
+			strcasestr(track->title,  needle) ||
+			strcasestr(track->album,  needle) ||
+			strcasestr(track->artist, needle)
+		);
+		track_free(track);
+
+		if (match) {
+			this.cursor_locked = 0;
+			this.cursor = index;
+			queue_redraw(ELEMENT_CAROUSEL);
+			return;
+		}
+	}
+}
+
+
 void input_prompt(int key)
 {
 	scuep_logf("%i\n", key);
@@ -214,6 +256,10 @@ void input_prompt(int key)
 		case '\n':
 			if (this.input_mode == MODE_COMMAND) {
 				shell_run_w(this.cmd.w);
+			}
+			if (this.input_mode == MODE_SEARCH) {
+				frontend_set_search(this.cmd.w);
+				frontend_search(+1);
 			}
 			this.input_mode = MODE_DEFAULT;
 			break;
@@ -400,8 +446,6 @@ void cursor_free(void)
 {
 	this.cursor_locked = false;
 }
-
-
 void input_default(int key)
 {
 	switch (key) {
@@ -415,6 +459,13 @@ void input_default(int key)
 			prompt_clear();
 			this.input_mode = MODE_SEARCH;
 			prompt_set_prefix("/");
+			break;
+
+		case 'n':
+			frontend_search(+1);
+			break;
+		case 'N':
+			frontend_search(-1);
 			break;
 
 		case 'd':
@@ -543,11 +594,17 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 
 	/* Search highlighting */
 	bool hl_cut = false;
-	/* TODO Function to determine searched term with more logic */
+
+	wchar_t *substring  = NULL;
+	wchar_t *needle     = this.search.w;
+	uint32_t needle_len = wcslen(needle);
+
 	if (this.cmd.prefix[0] == '/' && this.cmd.w_len > 0) {
-		wchar_t *substring  = NULL;
-		wchar_t *needle     = this.cmd.w;
-		uint32_t needle_len = this.cmd.w_len;
+		needle     = this.cmd.w;
+		needle_len = this.cmd.w_len;
+	}
+
+	if (needle_len) {
 		wchar_t *haystack   = wctext;
 		wchar_t  hl[1024];
 		uint32_t index = 0;

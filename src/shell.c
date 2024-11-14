@@ -34,5 +34,11 @@ void shell_run(const char* cmd)
 		frontend_next(-1);
 		return;
 	}
+
+	if (scuep_prefix("noh", cmd)
+	){
+		frontend_set_search(L"");
+		return;
+	}
 }
 
