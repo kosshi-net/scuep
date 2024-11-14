@@ -192,6 +192,7 @@ void input_prompt(int key)
 		case KEY_ESCAPE:
 			this.input_mode = MODE_DEFAULT;
 			prompt_set_prefix("");
+			prompt_clear();
 			break;
 		case KEY_BACKSPACE:
 		case 127:
@@ -211,7 +212,9 @@ void input_prompt(int key)
 
 		case KEY_ENTER: /* Keypad enter */
 		case '\n':
-			shell_run_w(this.cmd.w);
+			if (this.input_mode == MODE_COMMAND) {
+				shell_run_w(this.cmd.w);
+			}
 			this.input_mode = MODE_DEFAULT;
 			break;
 
@@ -263,6 +266,7 @@ int frontend_initialize(const char *fifopath)
 	init_pair(3, COLOR_YELLOW, -1);
 	init_pair(4, COLOR_RED, -1);
 	init_pair(5, COLOR_BLACK, COLOR_WHITE);
+	init_pair(6, COLOR_BLACK, 12);
 
 	this.playlist_items = playlist_count();
 
@@ -407,6 +411,12 @@ void input_default(int key)
 			prompt_set_prefix(":");
 			break;
 
+		case '/':
+			prompt_clear();
+			this.input_mode = MODE_SEARCH;
+			prompt_set_prefix("/");
+			break;
+
 		case 'd':
 			debug_mode = !debug_mode;
 			queue_redraw(ELEMENT_ALL);
@@ -493,7 +503,9 @@ void input(void)
 				input_default(key);
 				break;
 			case MODE_COMMAND:
+			case MODE_SEARCH:
 				input_prompt(key);
+				queue_redraw(ELEMENT_CAROUSEL); /* For search highlighting */
 				break;
 			default:
 				scuep_logf("Invalid input mode, resetting to default\n");
@@ -507,23 +519,66 @@ void input(void)
 }
 
 
-
 #define ALIGN_RIGHT 1
-void carousel_text( int row, int col, int w, wchar_t *wctext, int flags )
+void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 {
 	static wchar_t wccut[1024] = {0};
-	uint32_t wcw;
-	int cut = scuep_wcslice( wccut, wctext, w-2, &wcw );
+	uint32_t wccut_len = 0;
+	uint32_t wcw; /* Visual width of wccut */
+
+	int cut = scuep_wcsnvslice(wccut, wctext, w-2, LENGTH(wccut), &wcw);
+	wccut_len = wcslen(wccut);
 
 	if (flags & ALIGN_RIGHT) {
-		int total = wcw + (w-wcw)*cut;
+		uint32_t total = wcw + (w-wcw)*cut;
 		col -= total;
 	}
-	mvprintw( row, col, "%S", wccut);
-	if (cut)
-		mvprintw( row, col+wcw, "%.*s", w-wcw, ".....");
-}
+	mvprintw(row, col, "%S", wccut);
 
+	/* Search highlighting */
+	bool hl_cut = false;
+	/* TODO Function to determine searched term with more logic */
+	if (this.cmd.prefix[0] == '/' && this.cmd.w_len > 0) {
+		wchar_t *substring  = NULL;
+		wchar_t *needle     = this.cmd.w;
+		uint32_t needle_len = this.cmd.w_len;
+		wchar_t *haystack   = wctext;
+		wchar_t  hl[1024];
+		uint32_t index = 0;
+
+		attron(COLOR_PAIR(6));
+		while ((substring = scuep_wcscasestr(haystack, needle))) {
+			index = substring - wctext;
+			if (index >= wccut_len) {
+				hl_cut = true;
+				break;
+			}
+
+			uint32_t hl_len = MIN(needle_len, LENGTH(hl)-1);
+			wcsncpy(hl, wccut+index, hl_len);
+			hl[hl_len] = '\0';
+
+			/* Calculate actual position of needle */
+			uint32_t hx = col;
+			for (uint32_t i = 0; i < index; i++) {
+				hx += wcwidth(wctext[i]);
+			}
+
+			mvprintw(row, hx, "%S", hl);
+
+			haystack += needle_len;
+		}
+		attroff(COLOR_PAIR(6));
+		if (haystack-wctext >= wccut_len) hl_cut = true;
+	}
+
+	/* Print "..." for truncated text */
+	if (cut) {
+		if (hl_cut) attron(COLOR_PAIR(6));
+		mvprintw( row, col+wcw, "%.*s", w-wcw, ".....");
+		if (hl_cut) attroff(COLOR_PAIR(6));
+	}
+}
 
 
 void draw_carousel(void)

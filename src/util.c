@@ -93,26 +93,29 @@ wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle)
 
 }
 
-/*
- * Copies characters until total glyph width exceeds max_width. If source text
- * was not cut, returns 0, otherwise returns total glyph width.
- */
-int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width )
+int scuep_wcsnvslice(
+	wchar_t *dst,
+	wchar_t *wc,
+	uint32_t max_width,
+	uint32_t n,
+	uint32_t *width)
 {
+	n--;
+	uint32_t i = 0;
 	*width = 0;
 	while(*wc){
 		int gw = wcwidth(*wc);
 
-		if(*width+gw > max_width ){
-			*dst++ = 0;
+		if(*width+gw > max_width || i >= n){
+			dst[i++] = 0;
 			return 1;
 		}
 
-		*dst++ = *wc++;
+		dst[i++] = *wc++;
 		*width += gw;
 	}
 
-	*dst++ = 0;
+	dst[i++] = 0;
 	return 0;
 }
 

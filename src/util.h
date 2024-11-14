@@ -35,10 +35,20 @@ char *scuep_strdup(const char*);
 wchar_t *scuep_wcscasestr(wchar_t *haystack, wchar_t *needle);
 
 /*
- * Copies characters, calculating their printed width, until max_width is
- * reached
+ * The purpose of this function is to truncate wide char strings by visual
+ * width, for printing.
+ * Copies characters, calculating their print width, until max_width is reached
+ * or until n-1 items have been written. Always null terminates the
+ * buffer (writes 0 into dst[n] if it reaches that point).
+ * Writes visual width of dst into out_width.
+ * Returns 1 if src did not fit into dst, 0 otherwise.
  */
-int scuep_wcslice(wchar_t* dst, wchar_t *wc, uint32_t max_width, uint32_t *width );
+int scuep_wcsnvslice(
+	wchar_t *dst,
+	wchar_t *src,
+	uint32_t max_width,
+	uint32_t n,
+	uint32_t *out_width);
 
 /*
  * Reallocates dest and adds src to it.
