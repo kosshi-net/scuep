@@ -817,8 +817,10 @@ void draw_prompt(void)
 
 	for (int32_t i = 0; i <= this.cmd.w_len; i++) {
 		wchar_t wc = this.cmd.w[i];
-		if(wc == 0) wc = ' ';
-		if(i == this.cmd.cursor && this.input_mode == MODE_COMMAND)
+		if (wc == 0) wc = ' ';
+		if (i == this.cmd.cursor
+		&& (this.input_mode == MODE_COMMAND || this.input_mode == MODE_SEARCH)
+		)
 			attron(COLOR_PAIR(5));
 		printw("%C", wc);
 		attroff(COLOR_PAIR(5));
