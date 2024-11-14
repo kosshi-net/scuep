@@ -45,6 +45,8 @@ TODO. See legacy branch for more information.
 | v              | Stop playback. Unitializes decoder and audio driver, minimizing idle resource usage |
 | b              | Play next |
 | :              | Enter command (see Commands)  |
+| /              | Search  |
+| n, N           | Find next or prev track matching search |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | d              | Toggle debug panel |
@@ -59,6 +61,7 @@ with `scuep-remote`, or by piping them into `.config/scuep/fifo`.
 | `toggle` `pause`  | Toggles play/pause of playback |
 | `next` `skip`     | Skip track |
 | `prev`            | Previous track |
+| `noh`             | Clears search highlighting  |
 
 ### Command line arguments
 | Flag | Function |
