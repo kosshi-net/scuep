@@ -23,7 +23,7 @@ Other issues, bugs, & TODO
 - Decoder edge case bugs
 	- Playback sometimes freezes at the end of tracks
 	- Pausing  sometimes causes 100% cpu usage
-	- Unwanted noise when skipping a paused track
+	- Seeking while paused does not work correctly
 - Segfault on missing cached files
 - Player does warn about running multiple instances leading to weird behavior
 - libcue has some minor issues, write your own cue sheet parser?

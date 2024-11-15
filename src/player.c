@@ -211,7 +211,6 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 	if (this->channels    != param->ch_layout.nb_channels
 	||  this->sample_rate != param->sample_rate
 	||  this->format      != param->format
-	// ??? ||  this->pause       == true
 	){
 		if (!flush) {
 			scuep_logf("Could not soft reconfig:\n");
@@ -246,11 +245,11 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 		if (flush
 		 && this->head.total > this->tail.total
 		) {
-			this->head.total = this->tail.total + this->period;
-			this->head.ring  = this->tail.ring  + this->period;
+			this->head.total = this->tail.total;
+			this->head.ring  = this->tail.ring;
 			this->head.ring %= this->frames;
 		}
-		scuep_logf("Soft reconfig\n");
+		scuep_logf("Soft reconfig (flush %i)\n", flush);
 	}
 
 	scuep_logf("Buffer time: %f seconds\n", this->frames / (float)param->sample_rate);
