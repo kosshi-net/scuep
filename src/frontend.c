@@ -154,8 +154,8 @@ void prompt_clear(void)
 
 void command_delete(int32_t pos)
 {
-	if(pos < 0) return;
-	if(pos >= this.cmd.w_len) return;
+	if (pos < 0) return;
+	if (pos >= this.cmd.w_len) return;
 
 	for (int i = pos; i < this.cmd.w_len; i++) {
 		this.cmd.w[i] = this.cmd.w[i+1];
@@ -236,6 +236,7 @@ void input_prompt(int key)
 			prompt_set_prefix("");
 			prompt_clear();
 			break;
+
 		case KEY_BACKSPACE:
 		case 127:
 			this.cmd.cursor--;
@@ -288,8 +289,8 @@ void layout_update()
 
 	layout.carousel[0] = 3;
 	layout.carousel[1] = layout.progress-1;
-
 }
+
 
 int frontend_initialize(const char *fifopath)
 {
@@ -298,10 +299,10 @@ int frontend_initialize(const char *fifopath)
 
 	screen = newterm(term_type, stdout, term_in);
 
-	cbreak();              //
-	noecho();              // input echo
-	curs_set(0);           // Disable cursor
-	keypad(stdscr, TRUE);  // Arrow keys
+	cbreak();
+	noecho();              /* Input echo */
+	curs_set(0);           /* Disable cursor */
+	keypad(stdscr, TRUE);  /* Arrow keys */
 
 	notimeout(stdscr, FALSE);
 	ESCDELAY = 25;
@@ -322,9 +323,9 @@ int frontend_initialize(const char *fifopath)
 	this.fifo.fds[0].fd     = this.fifo.fd;
 	this.fifo.fds[0].events = POLLIN;
 	/* Clear fifo in case it's been written into offline */
-	while(read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1) );
+	while (read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1));
 
-	while(!this.should_quit){
+	while (!this.should_quit) {
 		frontend_tick();
 	}
 
@@ -446,6 +447,8 @@ void cursor_free(void)
 {
 	this.cursor_locked = false;
 }
+
+
 void input_default(int key)
 {
 	switch (key) {
@@ -464,6 +467,7 @@ void input_default(int key)
 		case 'n':
 			frontend_search(+1);
 			break;
+
 		case 'N':
 			frontend_search(-1);
 			break;
@@ -571,7 +575,7 @@ void input(void)
 
 
 #define CAROUSEL_PRINT_ALIGN_RIGHT (1<<0)
-#define CAROUSEL_PRINT_FOCUSED (1<<1)
+#define CAROUSEL_PRINT_FOCUSED     (1<<1)
 void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 {
 	static wchar_t wccut[1024] = {0};
@@ -646,7 +650,6 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 
 void draw_carousel(void)
 {
-
 	mvprintw(1, layout.pad[0], "Playlist: %i / %i", this.cursor+1, this.playlist_items);
 	clrtoeol();
 	mvprintw(1, term_cols-layout.pad[0] - 11, "scuep-ffsql" );
@@ -698,7 +701,6 @@ void draw_carousel(void)
 		}
 
 		if (w-title_min > artist_min) {
-
 			mbstowcs(wctext, track->artist, 1023);
 			r += artist_min;
 			carousel_text(row, term_cols-r, artist_min, wctext, flags);
@@ -716,9 +718,7 @@ void draw_carousel(void)
 		move(++row, 0);
 		clrtoeol();
 	}
-
 }
-
 
 
 void draw_debug(void)
@@ -728,7 +728,7 @@ void draw_debug(void)
 	for (size_t i = 0; i < term_cols; i++) {
 		mvprintw(layout.debug,i, "-" );
 	}
-	for (size_t i = layout.debug+1; i <term_rows; i++) {
+	for (size_t i = layout.debug+1; i < term_rows; i++) {
 		move(i,0);
 		clrtoeol();
 	}
@@ -736,7 +736,7 @@ void draw_debug(void)
 	mvprintw(layout.debug, term_cols/2-3, " Debug " );
 
 
-	if(!player){
+	if (!player) {
 		mvprintw(layout.debug+1,0, "%s", "Player uninitialized" );
 	} else {
 		mvprintw(layout.debug+1,0,
@@ -801,10 +801,7 @@ void draw_progress(void)
 	pos += r;
 
 	while (l-r > 0) {
-		if (pos == r)
-			mvprintw(layout.progress, r, "|");
-		else
-			mvprintw(layout.progress, r, "-");
+		mvprintw(layout.progress, r, (pos == r) ?  "|" : "-");
 		r++;
 	}
 };
@@ -813,15 +810,16 @@ void draw_prompt(void)
 {
 	move(layout.prompt, 0);
 	clrtoeol();
-	mvprintw(layout.prompt, 0, "%S",this.cmd.prefix);
+	mvprintw(layout.prompt, 0, "%S", this.cmd.prefix);
 
 	for (int32_t i = 0; i <= this.cmd.w_len; i++) {
 		wchar_t wc = this.cmd.w[i];
 		if (wc == 0) wc = ' ';
 		if (i == this.cmd.cursor
 		&& (this.input_mode == MODE_COMMAND || this.input_mode == MODE_SEARCH)
-		)
+		){
 			attron(COLOR_PAIR(5));
+		}
 		printw("%C", wc);
 		attroff(COLOR_PAIR(5));
 	}

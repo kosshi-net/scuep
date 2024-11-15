@@ -10,7 +10,6 @@ This is a near full rewrite of scuep. Largest differences to legacy brach:
 - Much nicer modular design
 
 Unimplemented features
-- Search
 - Many legacy commands
 - Selections
 - Volume control
