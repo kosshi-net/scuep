@@ -3,8 +3,10 @@ A simple terminal music player for GNU/Linux.
 
 ## WIP!! - Rewrite branch
 This is a near full rewrite of scuep. Largest differences to legacy brach:
-- Entierly custom multithreaded audio backend using libavcodec (ffmpeg)
-- Heavy use of SQLite as a metadata cache
+- Custom multithreaded audio backend using libavcodec (ffmpeg)
+    - Supports gapless playback (where formats allow)
+	- Unprocessed audio, compatibility (resampling) relegated to sound server
+- SQLite as a metadata cache
 	- Import and storage is far more robust and much faster than before
 	- Instant cold start
 - Much nicer modular design
@@ -21,13 +23,16 @@ Other issues, bugs, & TODO
 - Not tested on other \*nixes
 - `wchar_t` must be UTF-32, behavior with UTF-16 is undefined (does ncursesw even handle UTF-16?)
 - Decoder edge case bugs
-	- Playback sometimes freezes at the end of tracks
+	- Playback sometimes freezes at the end of tracks (this probably has been fixed now?)
 	- Pausing  sometimes causes 100% cpu usage
 	- Seeking while paused does not work correctly
 - Segfault on missing cached files
 - Player does warn about running multiple instances leading to weird behavior
 - libcue has some minor issues, write your own cue sheet parser?
-- Various UI improvements
+- Undefined behavior when gaplessly playing tracks shorter than the ring buffer
+    - Or stacking track preloads in general
+- Various UI improvements needed
+- A lot more testing needed
 
 ## Documentation
 TODO. See legacy branch for more information.
@@ -48,7 +53,9 @@ TODO. See legacy branch for more information.
 | n, N           | Find next or prev track matching search |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
-| d              | Toggle debug panel |
+| d              | (DEBUG) Toggle debug panel |
+| D              | (DEBUG) Force decoder to quit |
+| L              | (DEBUG) Force preload a track for gapless playback |
 
 ### Commands
 

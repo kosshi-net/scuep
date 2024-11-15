@@ -73,7 +73,6 @@ static struct {
 
 	/* Zero indexed */
 	int32_t playlist_items;
-	int32_t active;
 
 	int32_t cursor;
 	bool    cursor_locked;
@@ -114,7 +113,7 @@ static struct {
 	} input_mode;
 
 } this = {
-	.cursor_locked = true,
+	.cursor_locked = false,
 	.input_mode = MODE_DEFAULT,
 };
 
@@ -393,17 +392,33 @@ int frontend_tick(void)
 	if(elements_dirty) refresh();
 	elements_dirty = 0;
 
+	/* Detect when backend track changes. */
+	static uint32_t prev_state;
+	uint32_t new_state = player_state_key();
+	if (new_state != -1 && prev_state != new_state) {
+		queue_redraw(ELEMENT_ALL);
+		if (this.cursor_locked) this.cursor = new_state;
+	}
+	prev_state = new_state;
 
 	/*
-	 * TODO: Hotwired Autoplay
+	 * TODO: This is temporary hotwired autoplay, formalize the logic
 	 */
 	struct PlayerState *player = _get_playerstate();
 	if (player) {
+
+
 		if (player->head.done
 		&&  player->head.total - player->tail.total == 0
 		&& !player->pause
 		) {
 			frontend_next(1);
+		}
+		else
+		if (player->head.done && !player->preload_failed) {
+			/* Preload next track */
+			uint32_t id = (this.playlist_items+player_state_key()+1) % this.playlist_items;
+			player_load( playlist_track( id+1 ), id, true);
 		}
 	}
 
@@ -418,28 +433,25 @@ int frontend_terminate(void)
 
 void frontend_play(int id)
 {
-	this.active = id;
-	player_load( playlist_track( id+1 ) );
+	player_load( playlist_track(id+1), id, false );
 	player_play();
 
-	if (this.cursor_locked)
-		this.cursor = this.active;
-
-	queue_redraw(ELEMENT_CAROUSEL);
+	if (this.cursor_locked) {
+		this.cursor = id;
+	}
 }
 
 void frontend_next(int32_t num)
 {
-	this.active += num;
-	this.active = ( this.playlist_items + this.active ) % this.playlist_items;
-	frontend_play(this.active);
+	int32_t active = player_state_key() + num;
+	active = ( this.playlist_items + active ) % this.playlist_items;
+	frontend_play(active);
 }
 
 void cursor_lock(void)
 {
 	this.cursor_locked = true;
-	this.cursor = this.active;
-	queue_redraw(ELEMENT_ALL);
+	this.cursor = player_state_key();
 }
 
 
@@ -486,6 +498,14 @@ void input_default(int key)
 			cursor_lock();
 			break;
 
+		case 'L':
+			/* Preload track, debugging purposes */
+			{
+				player_load( playlist_track( this.cursor+1 ), this.cursor, true);
+				cursor_lock();
+			}
+			break;
+
 		case KEY_RIGHT:
 			player_seek_relative( 5.0);
 			break;
@@ -495,6 +515,7 @@ void input_default(int key)
 
 		case KEY_ESCAPE:
 			cursor_lock();
+			queue_redraw(ELEMENT_ALL);
 			break;
 
 		case 'z':
@@ -678,7 +699,7 @@ void draw_carousel(void)
 			mvprintw( row, 1, "~" );
 			flags |= CAROUSEL_PRINT_FOCUSED;
 		}
-		if (i == this.active) {
+		if (i == player_state_key()) {
 			mvprintw( row, 1, ">" );
 		}
 
@@ -705,7 +726,7 @@ void draw_carousel(void)
 			r += artist_min;
 			carousel_text(row, term_cols-r, artist_min, wctext, flags);
 			w -= artist_min;
-			w -= 2; /* Leave a gap between title and artist*/
+			w -= 2; /* Leave a gap between title and artist */
 		}
 
 		mbstowcs(wctext, track->title, 1023);

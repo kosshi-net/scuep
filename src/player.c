@@ -19,9 +19,8 @@
 /*
  * Function declarations
  */
-static int decoder_load(TrackId, float);
-static int player_write( AVFrame*, int, int );
-static void player_write_blank_period();
+static int  decoder_load(TrackId, float, uint32_t, bool);
+static int  player_write( AVFrame*, int, int );
 static int  decoder_loop(void*arg);
 static void decoder_start(void);
 static void decoder_stop(void);
@@ -31,7 +30,6 @@ static void decoder_free(void);
  * File globals
  */
 static struct PlayerState *player = NULL;
-static struct PlayerInfo   info;
 
 /* Debug stuff */
 
@@ -52,28 +50,6 @@ struct PlayerState *_get_playerstate(void)
 	return player;
 }
 
-const struct PlayerInfo *player_get_info(void)
-{
-	info.player = player;
-
-	if (info.player == NULL) return &info;
-
-	info.paused   = player->pause;
-	info.track_id = player->track_id;
-
-	info.progress = player_position_seconds();
-	info.duration = player_duration_seconds();
-
-	info.next_available = false;
-
-	if (player->head.done
-	&&  player->head.total == player->tail.total
-	) {
-		info.next_available = true;
-	}
-
-	return &info;
-}
 
 void print_averr(int err)
 {
@@ -98,6 +74,12 @@ void player_init(void)
 	if (!player) player = calloc(sizeof(struct PlayerState), 1);
 }
 
+uint32_t player_state_key(void)
+{
+	if (!player) return -1;
+	return player->tail.state_key;
+}
+
 int player_play(void)
 {
 	if (!player) return 1;
@@ -120,12 +102,11 @@ int player_toggle(void)
 }
 
 
-int player_load(TrackId track_id)
+int player_load(TrackId track_id, uint32_t key, bool preload)
 {
 	if (!player)
 		player_init();
-	decoder_load(track_id, 0.0);
-	decoder_start();
+	decoder_load(track_id, 0.0, key, preload);
 	if (!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
@@ -135,8 +116,7 @@ int player_seek(float seconds)
 	struct PlayerState *this = player;
 	if (!this) return -1;
 
-	decoder_load(this->track_id, seconds);
-	decoder_start();
+	decoder_load(this->tail.track_id, seconds, this->tail.state_key, false);
 	if (!player->sndsvr_close) alsa_open( player );
 	return 0;
 }
@@ -168,16 +148,15 @@ float player_position_seconds(void)
 
 float player_duration_seconds(void)
 {
-	/* TODO fix wrong duration when decoding next track */
 	struct PlayerState *this = player;
 	if (!this || !this->av.track) return 0.0f;
-	return this->av.track->length / 1000.0f;
+	return this->tail.stream_length / 1000.0f;
 }
 
 TrackId player_current_track()
 {
 	if (!player) return 0;
-	return player->track_id;
+	return player->tail.track_id;
 }
 
 int player_stop(void)
@@ -241,6 +220,7 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 		this->tail.ring = 0;
 		this->head.total = 0;
 		this->tail.total = 0;
+
 	} else {
 		if (flush
 		 && this->head.total > this->tail.total
@@ -276,7 +256,7 @@ void decoder_free(void)
 	this->stream = NULL;
 }
 
-int decoder_load(TrackId track_id, float seek)
+int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 {
 	scuep_logf("Decoder load %i seek %f\n", track_id, seek);
 	struct DecoderState *this = &player->av;
@@ -284,7 +264,7 @@ int decoder_load(TrackId track_id, float seek)
 
 	decoder_free();
 
-	player->track_id = track_id;
+	player->head.track_id = track_id;
 
 	this->track     = track_load(track_id);
 	if (!this->track){
@@ -398,18 +378,25 @@ int decoder_load(TrackId track_id, float seek)
 	 **************/
 
 	scuep_logf("Open audio\n");
-	ret = player_reconfig(param, true);
+
+	player->head.state_key = key;
+	player->head.stream_length = this->track->length;
+
+	ret = player_reconfig(param, !preload);
 	if (!ret)
 		scuep_logf("Reconfig ok\n");
-	else goto error;
+	else
+		goto error;
 
+	player->preload_failed = false;
 	player->head.stream_changed  = player->head.total;
 	player->head.done     = 0;
-
+	decoder_start();
 	return 0;
 error:
 	scuep_logf("Error happened!\n");
 	print_averr(ret);
+	if (preload) player->preload_failed = true;
 	return -1;
 }
 
@@ -496,7 +483,6 @@ int decoder_loop(void*arg)
 	}
 
 finish:
-	player_write_blank_period();
 	av_packet_unref(this->packet);
 	scuep_logf("Decoder quit!\n");
 	this->thread_run = 0;
@@ -509,31 +495,6 @@ error:
 	return -1;
 }
 
-void player_write_blank_period(void)
-{
-	struct PlayerState *this = player;
-
-	uint64_t head = this->head.ring;
-	uint64_t next = (head / this->period ) * this->period;
-
-	if (next == head) return;
-
-	next += this->period;
-	uint64_t total = next - head;
-
-	memset(
-		this->data + (head * this->sizeof_frame),
-		0,
-		total * this->sizeof_frame
-	);
-
-	head += total;
-	head %= this->frames;
-	this->head.ring = head;
-	this->head.total += total;
-
-	return;
-}
 
 int player_write(
 	AVFrame *packet,
@@ -554,20 +515,18 @@ int player_write(
 	/* Loop until the whole packet has been written out */
 	while (left != 0 && this->av.thread_run) {
 
-		int available = this->frames -
-			           (this->head.total -
-		                this->tail.total);
+		int available = this->frames - (this->head.total - this->tail.total);
 
 		available = MIN(available, this->frames - head);
 		available = MIN(available, left);
 
 
-		if (available == 0){
+		if (available == 0) {
 			sleep_ms(5);
 			continue;
 		}
 
-		if (interleaved){
+		if (interleaved) {
 			memcpy(
 				this->data      + (head     * this->sizeof_frame),
 				packet->data[0] + (packet_written * this->sizeof_frame),

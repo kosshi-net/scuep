@@ -105,6 +105,8 @@ int alsa_loop(void*arg)
 	player->tail.track_id       = player->head.track_id;
 	player->tail.stream_changed = player->head.stream_changed;
 	player->tail.stream_offset  = player->head.stream_offset;
+	player->tail.stream_length  = player->head.stream_length;
+	player->tail.state_key      = player->head.state_key;
 
 	snd_pcm_sframes_t frames = 0;
 	snd_pcm_prepare(pcm);
@@ -117,15 +119,18 @@ int alsa_loop(void*arg)
 			player->tail.track_id       = player->head.track_id;
 			player->tail.stream_changed = player->head.stream_changed;
 			player->tail.stream_offset  = player->head.stream_offset;
+			player->tail.state_key      = player->head.state_key;
+			player->tail.stream_length  = player->head.stream_length;
 		}
 
 		uint32_t tail = player->tail.ring;
 
-		int total = MIN(player->head.total - player->tail.total, player->period);
+		int32_t total = MIN(player->head.total - player->tail.total, player->period);
 
-		if (total < player->period
-		||  player->pause
-		){
+		/* Prevent reading outside ring buffer */
+		total = MIN(total, player->frames - tail);
+
+		if (total < 1 ||  player->pause) {
 			snd_pcm_writei(pcm,
 				silence,
 				player->period
@@ -149,7 +154,7 @@ int alsa_loop(void*arg)
 			scuep_logf("Alsa error %s\n", snd_strerror(frames));
 			//snd_pcm_prepare(pcm);
 			int ok = snd_pcm_recover(pcm, frames, 0);
-			if(!ok){
+			if (!ok) {
 				scuep_logf("Failed to recover. State undefined.\n");
 			}
 			continue;
