@@ -5,6 +5,7 @@
 #include "alsa.h"
 #include "log.h"
 
+#include <libavutil/error.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -397,7 +398,7 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	decoder_start();
 	return 0;
 error:
-	scuep_logf("Error happened!\n");
+	scuep_logf("Error happened (decoder_load)!\n");
 	print_averr(ret);
 	if (preload) player->preload_failed = true;
 	return -1;
@@ -430,27 +431,32 @@ int decoder_loop(void*arg)
 	scuep_logf("Decode thread started\n");
 
 	AVCodecParameters *param = this->stream->codecpar;
-	int sample_rate = param->sample_rate;
+	int32_t sample_rate = param->sample_rate;
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
-	int __start  = track->start   * (sample_rate*0.001) ;
-	int __length = track->length  * (sample_rate*0.001) ;
+	int32_t start  = track->start   * (sample_rate*0.001) ;
+	int32_t length = track->length  * (sample_rate*0.001) ;
 
 	while (this->thread_run) {
 		av_packet_unref(this->packet);
-		ret = av_read_frame(this->format, this->packet);
-		if (ret < 0) goto error;
 
-		if (this->packet->stream_index != this->stream->index) continue;
+		ret = av_read_frame(this->format, this->packet);
+		if (ret < 0) switch (ret) {
+		case AVERROR_EOF:
+			goto finish;
+		default:
+			goto error;
+		}
+
+		if (this->packet->stream_index != this->stream->index)
+			continue;
 
 		ret = avcodec_send_packet( this->codec_ctx, this->packet );
 		if (ret < 0) {
 			scuep_logf("Send broke! %i\n", ret);
-			print_averr(ret);
-			break;
+			goto error;
 		}
 
 		while (ret >= 0 && this->thread_run) {
-
 			ret = avcodec_receive_frame( this->codec_ctx, this->frame);
 
 			int64_t sample_pos = av_rescale_q(
@@ -461,38 +467,30 @@ int decoder_loop(void*arg)
 
 			int64_t samples = this->frame->nb_samples;
 
-			if (sample_pos > __start+__length || debug.decoder_quit) {
-				debug.decoder_quit = false;
-				player->head.done = true;
+			if (sample_pos > start+length || debug.decoder_quit) {
 				goto finish;
 			}
-			if (!samples)        continue;
 
-			int cut_front = MAX( __start - sample_pos, 0);
-			int cut_back  = MAX( (sample_pos+samples)-(__start+__length), 0);
-			int total     = samples-cut_front-cut_back;
+			if (!samples) continue;
 
-			if (cut_front || cut_back) {
-				scuep_logf("%li, Frame %i+%i front %i, back %i\n",
-						sample_pos,
-						this->codec_ctx->frame_num,
-						this->frame->nb_samples,
-						cut_front, total
-				);
-			}
+			int32_t cut_front = MAX(start - sample_pos, 0);
+			int32_t cut_back  = MAX((sample_pos + samples) - (start + length), 0);
+			int32_t total     = samples - cut_front - cut_back;
 
 			player_write(this->frame, cut_front, total);
 		}
 	}
 
 finish:
+	debug.decoder_quit = false;
+	player->head.done = true;
 	av_packet_unref(this->packet);
 	scuep_logf("Decoder quit!\n");
 	this->thread_run = 0;
 	return 0;
 error:
 	av_packet_unref(this->packet);
-	scuep_logf("Error happened!\n");
+	scuep_logf("Error happened (decoder_loop)!\n");
 	this->thread_run = 0;
 	print_averr(ret);
 	return -1;

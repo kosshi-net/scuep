@@ -23,8 +23,6 @@ Other issues, bugs, & TODO
 - Not tested on other \*nixes
 - `wchar_t` must be UTF-32, behavior with UTF-16 is undefined (does ncursesw even handle UTF-16?)
 - Decoder edge case bugs
-	- Playback sometimes freezes at the end of tracks (this probably has been fixed now?)
-	- Pausing  sometimes causes 100% cpu usage
 	- Seeking while paused does not work correctly
 - Segfault on missing cached files
 - Player does warn about running multiple instances leading to weird behavior
