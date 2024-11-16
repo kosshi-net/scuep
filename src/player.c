@@ -212,6 +212,9 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 		this->size          = this->frames * this->sizeof_frame;
 
 		this->data    = malloc(this->size);
+
+		scuep_logf("Buffer memory usage: %i KB\n", this->size / 1024);
+
 		if (1) {
 			for (int i = 0; i < this->size; i++)
 				this->data[i] = rand();

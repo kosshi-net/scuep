@@ -761,24 +761,24 @@ void draw_debug(void)
 		mvprintw(layout.debug+1,0, "%s", "Player uninitialized" );
 	} else {
 		mvprintw(layout.debug+1,0,
-			" paused: %i"
+			"paused: %i"
 			" done: %i"
 			" decoder: %i"
-			" sndsvr %i"
-			" buffer: %li"
+			" sndsvr: %i"
 			,player->pause
 			,player->head.done
 			,player->av.thread_run
 			,!!player->sndsvr_close
-			,player->head.total - player->tail.total
 		);
 		mvprintw(layout.debug+2,0,
-			"%.02f / %.02f "
-			"head: %li tail: %li",
+			"%.02f / %.02f"
+			" head: %li tail: %li"
+			" buffer: %li",
 			player_position_seconds(),
 			player_duration_seconds(),
 			player->head.ring,
 			player->tail.ring
+			,player->head.total - player->tail.total
 		);
 		mvprintw(layout.debug+3,0,
 			"Input mode: %i, cursor: %i",
