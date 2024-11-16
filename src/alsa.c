@@ -39,9 +39,7 @@ snd_pcm_format_t format_av2alsa(enum AVSampleFormat f)
 
 		default:
 			return SND_PCM_FORMAT_UNKNOWN;
-
 	}
-
 }
 
 static int alsa_loop(void*arg);
@@ -56,9 +54,9 @@ int alsa_open(struct PlayerState *_player)
 	silence = calloc(player->period, player->sizeof_frame);
 	snd_pcm_format_t format = format_av2alsa( player->format );
 
-	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0){
+	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
         scuep_logf("Playback open error: %s\n", snd_strerror(err));
-		return -1;
+		goto error;
     }
 
 	if ((err = snd_pcm_set_params(pcm,
@@ -71,20 +69,25 @@ int alsa_open(struct PlayerState *_player)
 		) ) < 0
 	){
 		scuep_logf("Playback open error: %s\n", snd_strerror(err));
-		return -1;
+		goto error;
     }
 
 	player->sndsvr_close = alsa_close;
-	thrd_create( &thread, &alsa_loop, NULL );
+	thrd_create(&thread, &alsa_loop, NULL);
 
 	scuep_logf("Alsa open OK\n");
 
 	return 0;
+	error:
+	free(silence);
+	silence = NULL;
+	return -1;
+
 }
 
 int alsa_close(void)
 {
-	if (thread_run){
+	if (thread_run) {
 		player->sndsvr_close = NULL;
 		thread_run = 0;
 		thrd_join(thread, NULL);
