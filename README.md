@@ -77,6 +77,3 @@ with `scuep-remote`, or by piping them into `.config/scuep/fifo`.
 | --reset          | Reset database, clearing cache |
 | --debug          | Enable logging to stderr. Usage: `scuep --debug 2>log.txt` |
 
-## License
-GPLv2
-
