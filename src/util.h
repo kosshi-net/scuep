@@ -17,6 +17,8 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 
+#define LENGTH(arr) (sizeof(arr)/sizeof(*arr))
+
 /*
  * Points to the start of the filename in the path provided.
  * Does not edit or copy.

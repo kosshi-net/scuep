@@ -1,65 +1,92 @@
 #include "config.h"
-
 #include "frontend.h"
 #include "database.h"
 #include "player.h"
 #include "log.h"
 #include "shell.h"
-
 #include "util.h"
 
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <ncurses.h>
 #include <locale.h>
-
 #include <string.h>
 #include <wchar.h>
-
-#include <wchar.h>
 #include <locale.h>
-
 #include <sys/stat.h>
 #include <poll.h>
+
+/* In VIM, use ":r!figlet Text" to print big labels */
+
+/*
+ ____        __ _
+|  _ \  ___ / _(_)_ __   ___  ___
+| | | |/ _ \ |_| | '_ \ / _ \/ __|
+| |_| |  __/  _| | | | |  __/\__ \
+|____/ \___|_| |_|_| |_|\___||___/
+*/
+
+
+#define KEY_ESCAPE 27
+
+
+/*
+ _____                       _           _
+|  ___|   _ _ __   ___    __| | ___  ___| |
+| |_ | | | | '_ \ / __|  / _` |/ _ \/ __| |
+|  _|| |_| | | | | (__  | (_| |  __/ (__| |
+|_|   \__,_|_| |_|\___|  \__,_|\___|\___|_|
+*/
+
+
+static void draw_carousel(void);
+static void draw_progress(void);
+static void draw_debug(void);
+static void draw_prompt(void);
+static void input(void);
+static void queue_redraw(int elem);
+static void poll_remote(void);
+static void layout_update(void);
+static void poll_remote(void);
+static void prompt_set_prefix(char *str);
+static void frontend_search(int dir);
+static void prompt_clear(void);
+static void input_prompt(int key);
+static void cursor_lock(void);
+static void cursor_free(void);
+static void frontend_play(int id);
+static void input_default(int key);
+static void prompt_delete(int32_t pos);
+static void prompt_insert(char c);
+
+
+/*
+  ____ _       _           _
+ / ___| | ___ | |__   __ _| |___
+| |  _| |/ _ \| '_ \ / _` | / __|
+| |_| | | (_) | |_) | (_| | \__ \
+ \____|_|\___/|_.__/ \__,_|_|___/
+*/
+
+/* TODO: Put everything under "this" */
 
 /*
  * To avoid unnecessary redraws, use queue_redraw(ELEMENT_*) when relevant
  * state changes happen.
  * */
 
-/* Clears all elemenets. Use ELEMENT_ALL to set */
-#define ELEMENT_CLEAR    (1<<0)
-
-#define ELEMENT_PROGRESS (1<<1)
-#define ELEMENT_CAROUSEL (1<<2)
-#define ELEMENT_PROMPT   (1<<3)
-#define ELEMENT_DEBUG    (1<<4)
-
+/* ELEMENT_CLEAR clears all elemenets. Use ELEMENT_ALL to set */
+#define ELEMENT_CLEAR      (1<<0)
+#define ELEMENT_PROGRESS   (1<<1)
+#define ELEMENT_CAROUSEL   (1<<2)
+#define ELEMENT_PROMPT     (1<<3)
+#define ELEMENT_DEBUG      (1<<4)
 #define ELEMENT_PROPERTIES (1<<4)
-
 /* Redraws all elements */
 #define ELEMENT_ALL      (0xFFFF-ELEMENT_PROPERTIES)
 
-
-#define KEY_ESCAPE 27
-
-#define LENGTH(arr) (sizeof(arr)/sizeof(*arr))
-
 /* Use via queue_redraw(), not directly */
 static uint32_t elements_dirty = ELEMENT_ALL;
-
-void queue_redraw(int elem)
-{
-	elements_dirty |= elem;
-}
-
-
-static void draw_carousel();
-static void draw_progress();
-static void draw_debug();
-static void draw_prompt();
-static void input();
 
 static int term_cols = 0;
 static int term_rows = 0;
@@ -67,6 +94,16 @@ static int debug_mode = 0;
 
 static SCREEN *screen = NULL;
 
+static struct {
+	int32_t pad[2];
+	int32_t carousel[2];
+	int32_t progress;
+	int32_t debug;
+	int32_t prompt;
+} layout;
+
+
+/* The "this" struct */
 static struct {
 	int32_t input_repeat;
 	bool    should_quit;
@@ -117,178 +154,14 @@ static struct {
 	.input_mode = MODE_DEFAULT,
 };
 
-static struct {
-	int32_t pad[2];
-	int32_t carousel[2];
-	int32_t progress;
-	int32_t debug;
-	int32_t prompt;
-} layout;
 
-void prompt_set_prefix(char *str)
-{
-	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
-}
-
-void prompt_set_prefix_w(wchar_t *str)
-{
-	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
-}
-
-void prompt_clear_c(void)
-{
-	memset(this.cmd.c, 0, sizeof(this.cmd.c));
-	this.cmd.c_len = 0;
-	scuep_logf("cmd.c cleared\n");
-}
-
-void prompt_clear(void)
-{
-	prompt_clear_c();
-	memset(this.cmd.w, 0, sizeof(this.cmd.w));
-	this.cmd.w_len = 0;
-	this.cmd.cursor = 0;
-	queue_redraw(ELEMENT_PROMPT);
-}
-
-void command_delete(int32_t pos)
-{
-	if (pos < 0) return;
-	if (pos >= this.cmd.w_len) return;
-
-	for (int i = pos; i < this.cmd.w_len; i++) {
-		this.cmd.w[i] = this.cmd.w[i+1];
-	}
-	this.cmd.w_len--;
-}
-
-void prompt_insert(char c)
-{
-	scuep_logf("Insert %i to %i\n", c, this.cmd.c_len);
-	this.cmd.c[this.cmd.c_len++] = c;
-
-	wchar_t w[128];
-	size_t ret = mbstowcs(w, this.cmd.c, LENGTH(w));
-
-	if (ret == -1) {
-		scuep_logf("cmd.c invalid\n");
-		return;
-	}
-
-	scuep_logf("String valid: [%s], committing\n", this.cmd.c);
-
-	this.cmd.w_len += ret;
-	for (int32_t i = this.cmd.w_len+ret; i > this.cmd.cursor; i--) {
-		this.cmd.w[i] = this.cmd.w[i-ret];
-	}
-
-	for (size_t i = 0; i < ret; i++){
-		this.cmd.w[this.cmd.cursor++] = w[i];
-	}
-
-	prompt_clear_c();
-}
-
-
-void frontend_set_search(wchar_t *str)
-{
-	wcsncpy(this.search.w, str, LENGTH(this.search.w)-1);
-	wcstombs(this.search.c, this.search.w, LENGTH(this.search.c)-1);
-}
-
-
-void frontend_search(int dir)
-{
-	char *needle = this.search.c;
-	if (needle[0] == '\0') return;
-
-	for (uint32_t j = 1; j < this.playlist_items; j++) {
-		uint32_t index = this.cursor + dir * j;
-		index = (index+this.playlist_items) % this.playlist_items;
-
-		TrackId trackid = playlist_track(index + 1);
-		struct ScuepTrack *track = track_load(trackid);
-
-		int match = (
-			strcasestr(track->title,  needle) ||
-			strcasestr(track->album,  needle) ||
-			strcasestr(track->artist, needle)
-		);
-		track_free(track);
-
-		if (match) {
-			this.cursor_locked = 0;
-			this.cursor = index;
-			queue_redraw(ELEMENT_CAROUSEL);
-			return;
-		}
-	}
-}
-
-
-void input_prompt(int key)
-{
-	scuep_logf("%i\n", key);
-	switch (key) {
-		case KEY_ESCAPE:
-			this.input_mode = MODE_DEFAULT;
-			prompt_set_prefix("");
-			prompt_clear();
-			break;
-
-		case KEY_BACKSPACE:
-		case 127:
-			this.cmd.cursor--;
-			command_delete(this.cmd.cursor);
-			break;
-		case 330: /* Delete */
-			command_delete(this.cmd.cursor);
-			break;
-
-		case KEY_LEFT:
-			this.cmd.cursor--;
-			break;
-		case KEY_RIGHT:
-			this.cmd.cursor++;
-			break;
-
-		case KEY_ENTER: /* Keypad enter */
-		case '\n':
-			if (this.input_mode == MODE_COMMAND) {
-				shell_run_w(this.cmd.w);
-			}
-			if (this.input_mode == MODE_SEARCH) {
-				frontend_set_search(this.cmd.w);
-				frontend_search(+1);
-			}
-			this.input_mode = MODE_DEFAULT;
-			break;
-
-		default:
-			prompt_insert(key);
-			break;
-	}
-	this.cmd.cursor = MIN(MAX(this.cmd.cursor, 0),this.cmd.w_len);
-	queue_redraw(ELEMENT_PROMPT);
-}
-
-void layout_update()
-{
-	layout.pad[0] = 4;
-	layout.pad[1] = 1;
-
-	if (term_cols < 32) layout.pad[0] = 0;
-
-	layout.progress = term_rows - layout.pad[1] - 1;
-
-	layout.debug = term_rows - 5;
-	if(debug_mode) layout.progress -= 5;
-
-	layout.prompt = layout.progress+1;
-
-	layout.carousel[0] = 3;
-	layout.carousel[1] = layout.progress-1;
-}
+/*
+ __  __       _
+|  \/  | __ _(_)_ __
+| |\/| |/ _` | | '_ \
+| |  | | (_| | | | | |
+|_|  |_|\__,_|_|_| |_|
+*/
 
 
 int frontend_initialize(const char *fifopath)
@@ -329,35 +202,6 @@ int frontend_initialize(const char *fifopath)
 	}
 
 	return 0;
-}
-
-
-void poll_remote(void)
-{
-	if (poll(this.fifo.fds, 1, 0) < 1) {
-		return;
-	}
-
-	int bytes = read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1);
-	if (bytes < 1) {
-		return;
-	}
-
-	this.fifo.buffer[bytes] = 0;
-
-	char *head = this.fifo.buffer;
-	char *tail = head;
-
-	while (*head) {
-		switch (*head) {
-		case '\n':
-			*head = 0;
-			shell_run(tail);
-			tail = head+1;
-			break;
-		}
-		head++;
-	}
 }
 
 
@@ -425,39 +269,77 @@ int frontend_tick(void)
 	return 0;
 }
 
+
 int frontend_terminate(void)
 {
 	endwin();
 	return 0;
 }
 
-void frontend_play(int id)
-{
-	player_load( playlist_track(id+1), id, false );
-	player_play();
 
-	if (this.cursor_locked) {
-		this.cursor = id;
+void poll_remote(void)
+{
+	if (poll(this.fifo.fds, 1, 0) < 1) {
+		return;
+	}
+
+	int bytes = read(this.fifo.fd, this.fifo.buffer, sizeof(this.fifo.buffer)-1);
+	if (bytes < 1) {
+		return;
+	}
+
+	this.fifo.buffer[bytes] = 0;
+
+	char *head = this.fifo.buffer;
+	char *tail = head;
+
+	while (*head) {
+		switch (*head) {
+		case '\n':
+			*head = 0;
+			shell_run(tail);
+			tail = head+1;
+			break;
+		}
+		head++;
 	}
 }
 
-void frontend_next(int32_t num)
-{
-	int32_t active = player_state_key() + num;
-	active = ( this.playlist_items + active ) % this.playlist_items;
-	frontend_play(active);
-}
 
-void cursor_lock(void)
-{
-	this.cursor_locked = true;
-	this.cursor = player_state_key();
-}
+/*
+ ___                   _
+|_ _|_ __  _ __  _   _| |_
+ | || '_ \| '_ \| | | | __|
+ | || | | | |_) | |_| | |_
+|___|_| |_| .__/ \__,_|\__|
+          |_|
+*/
 
 
-void cursor_free(void)
+void input(void)
 {
-	this.cursor_locked = false;
+	timeout(100);
+	int key = getch();
+
+	while (key != ERR) {
+		switch(this.input_mode){
+			case MODE_DEFAULT:
+				input_default(key);
+				break;
+			case MODE_COMMAND:
+			case MODE_SEARCH:
+				input_prompt(key);
+				queue_redraw(ELEMENT_CAROUSEL); /* For search highlighting */
+				break;
+			default:
+				scuep_logf("Invalid input mode, resetting to default\n");
+				this.input_mode = MODE_DEFAULT;
+				break;
+		}
+
+		timeout(0);
+		key = getch();
+	}
 }
 
 
@@ -568,30 +450,260 @@ void input_default(int key)
 	}
 }
 
-void input(void)
+
+void input_prompt(int key)
 {
-	timeout(100);
-	int key = getch();
+	scuep_logf("%i\n", key);
+	switch (key) {
+		case KEY_ESCAPE:
+			this.input_mode = MODE_DEFAULT;
+			prompt_set_prefix("");
+			prompt_clear();
+			break;
 
-	while (key != ERR) {
-		switch(this.input_mode){
-			case MODE_DEFAULT:
-				input_default(key);
-				break;
-			case MODE_COMMAND:
-			case MODE_SEARCH:
-				input_prompt(key);
-				queue_redraw(ELEMENT_CAROUSEL); /* For search highlighting */
-				break;
-			default:
-				scuep_logf("Invalid input mode, resetting to default\n");
-				this.input_mode = MODE_DEFAULT;
-				break;
-		}
+		case KEY_BACKSPACE:
+		case 127:
+			this.cmd.cursor--;
+			prompt_delete(this.cmd.cursor);
+			break;
+		case 330: /* Delete */
+			prompt_delete(this.cmd.cursor);
+			break;
 
-		timeout(0);
-		key = getch();
+		case KEY_LEFT:
+			this.cmd.cursor--;
+			break;
+		case KEY_RIGHT:
+			this.cmd.cursor++;
+			break;
+
+		case KEY_ENTER: /* Keypad enter */
+		case '\n':
+			if (this.input_mode == MODE_COMMAND) {
+				shell_run_w(this.cmd.w);
+			}
+			if (this.input_mode == MODE_SEARCH) {
+				frontend_set_search(this.cmd.w);
+				frontend_search(+1);
+			}
+			this.input_mode = MODE_DEFAULT;
+			break;
+
+		default:
+			prompt_insert(key);
+			break;
 	}
+	this.cmd.cursor = MIN(MAX(this.cmd.cursor, 0),this.cmd.w_len);
+	queue_redraw(ELEMENT_PROMPT);
+}
+
+
+/*
+ ____                            _
+|  _ \ _ __ ___  _ __ ___  _ __ | |_
+| |_) | '__/ _ \| '_ ` _ \| '_ \| __|
+|  __/| | | (_) | | | | | | |_) | |_
+|_|   |_|  \___/|_| |_| |_| .__/ \__|
+                          |_|
+*/
+
+
+void prompt_set_prefix(char *str)
+{
+	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
+}
+
+
+void prompt_set_prefix_w(wchar_t *str)
+{
+	wcsncpy(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
+}
+
+
+void prompt_clear_c(void)
+{
+	memset(this.cmd.c, 0, sizeof(this.cmd.c));
+	this.cmd.c_len = 0;
+	scuep_logf("cmd.c cleared\n");
+}
+
+
+void prompt_clear(void)
+{
+	prompt_clear_c();
+	memset(this.cmd.w, 0, sizeof(this.cmd.w));
+	this.cmd.w_len = 0;
+	this.cmd.cursor = 0;
+	queue_redraw(ELEMENT_PROMPT);
+}
+
+
+void prompt_delete(int32_t pos)
+{
+	if (pos < 0) return;
+	if (pos >= this.cmd.w_len) return;
+
+	for (int i = pos; i < this.cmd.w_len; i++) {
+		this.cmd.w[i] = this.cmd.w[i+1];
+	}
+	this.cmd.w_len--;
+}
+
+
+void prompt_insert(char c)
+{
+	scuep_logf("Insert %i to %i\n", c, this.cmd.c_len);
+	this.cmd.c[this.cmd.c_len++] = c;
+
+	wchar_t w[128];
+	size_t ret = mbstowcs(w, this.cmd.c, LENGTH(w));
+
+	if (ret == -1) {
+		scuep_logf("cmd.c invalid\n");
+		return;
+	}
+
+	scuep_logf("String valid: [%s], committing\n", this.cmd.c);
+
+	this.cmd.w_len += ret;
+	for (int32_t i = this.cmd.w_len+ret; i > this.cmd.cursor; i--) {
+		this.cmd.w[i] = this.cmd.w[i-ret];
+	}
+
+	for (size_t i = 0; i < ret; i++){
+		this.cmd.w[this.cmd.cursor++] = w[i];
+	}
+
+	prompt_clear_c();
+}
+
+
+/*
+ ____                      _
+/ ___|  ___  __ _ _ __ ___| |__
+\___ \ / _ \/ _` | '__/ __| '_ \
+ ___) |  __/ (_| | | | (__| | | |
+|____/ \___|\__,_|_|  \___|_| |_|
+*/
+
+
+void frontend_set_search(wchar_t *str)
+{
+	wcsncpy(this.search.w, str, LENGTH(this.search.w)-1);
+	wcstombs(this.search.c, this.search.w, LENGTH(this.search.c)-1);
+}
+
+
+void frontend_search(int dir)
+{
+	char *needle = this.search.c;
+	if (needle[0] == '\0') return;
+
+	for (uint32_t j = 1; j < this.playlist_items; j++) {
+		uint32_t index = this.cursor + dir * j;
+		index = (index+this.playlist_items) % this.playlist_items;
+
+		TrackId trackid = playlist_track(index + 1);
+		struct ScuepTrack *track = track_load(trackid);
+
+		int match = (
+			strcasestr(track->title,  needle) ||
+			strcasestr(track->album,  needle) ||
+			strcasestr(track->artist, needle)
+		);
+		track_free(track);
+
+		if (match) {
+			this.cursor_locked = 0;
+			this.cursor = index;
+			queue_redraw(ELEMENT_CAROUSEL);
+			return;
+		}
+	}
+}
+
+
+/*
+ ____  _             _                _           _        _
+|  _ \| | __ _ _   _| |__   __ _  ___| | __   ___| |_ _ __| |
+| |_) | |/ _` | | | | '_ \ / _` |/ __| |/ /  / __| __| '__| |
+|  __/| | (_| | |_| | |_) | (_| | (__|   <  | (__| |_| |  | |
+|_|   |_|\__,_|\__, |_.__/ \__,_|\___|_|\_\  \___|\__|_|  |_|
+               |___/
+*/
+
+
+void frontend_play(int id)
+{
+	player_load( playlist_track(id+1), id, false );
+	player_play();
+
+	if (this.cursor_locked) {
+		this.cursor = id;
+	}
+}
+
+void frontend_next(int32_t num)
+{
+	int32_t active = player_state_key() + num;
+	active = ( this.playlist_items + active ) % this.playlist_items;
+	frontend_play(active);
+}
+
+
+/*
+  ____
+ / ___|   _ _ __ ___  ___  _ __
+| |  | | | | '__/ __|/ _ \| '__|
+| |__| |_| | |  \__ \ (_) | |
+ \____\__,_|_|  |___/\___/|_|
+*/
+
+
+void cursor_lock(void)
+{
+	this.cursor_locked = true;
+	this.cursor = player_state_key();
+}
+
+
+void cursor_free(void)
+{
+	this.cursor_locked = false;
+}
+
+
+/*
+ ____                _
+|  _ \ ___ _ __   __| | ___ _ __
+| |_) / _ \ '_ \ / _` |/ _ \ '__|
+|  _ <  __/ | | | (_| |  __/ |
+|_| \_\___|_| |_|\__,_|\___|_|
+*/
+
+
+void queue_redraw(int elem)
+{
+	elements_dirty |= elem;
+}
+
+
+void layout_update(void)
+{
+	layout.pad[0] = 4;
+	layout.pad[1] = 1;
+
+	if (term_cols < 32) layout.pad[0] = 0;
+
+	layout.progress = term_rows - layout.pad[1] - 1;
+
+	layout.debug = term_rows - 5;
+	if(debug_mode) layout.progress -= 5;
+
+	layout.prompt = layout.progress+1;
+
+	layout.carousel[0] = 3;
+	layout.carousel[1] = layout.progress-1;
 }
 
 
@@ -617,7 +729,10 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 	mvprintw(row, col, "%S", wccut);
 	attroff(COLOR_PAIR(1));
 
-	/* Search highlighting */
+	/*
+	 * Search highlighting
+	 */
+
 	bool hl_cut = false;
 
 	wchar_t *substring  = NULL;
@@ -787,6 +902,7 @@ void draw_debug(void)
 	}
 }
 
+
 void draw_progress(void)
 {
 	float fprogress = player_position_seconds();
@@ -826,6 +942,7 @@ void draw_progress(void)
 		r++;
 	}
 };
+
 
 void draw_prompt(void)
 {
