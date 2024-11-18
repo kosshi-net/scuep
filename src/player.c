@@ -56,7 +56,7 @@ void print_averr(int err)
 {
 	char errstr[512];
 	av_make_error_string(errstr, 512, err);
-	scuep_logf("AVERR %i: %s\n", err, errstr);
+	log_error("AVERR %i: %s", err, errstr);
 }
 
 /*
@@ -167,7 +167,7 @@ int player_stop(void)
 
 	if (this->sndsvr_close) this->sndsvr_close();
 	decoder_free();
-	scuep_logf("Freeing player\n");
+	log_info("Freeing player");
 
 	if (this->data) {
 		free(this->data);
@@ -193,11 +193,10 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 	||  this->format      != param->format
 	){
 		if (!flush) {
-			scuep_logf("Could not soft reconfig:\n");
-			scuep_logf("Current stream is not compatible with the next stream\n");
+			log_debug("Streams incompatible, hard reconfig required");
 			return 1;
 		}
-		scuep_logf("Hard reconfig\n");
+		log_info("Hard reconfig");
 		if (this->sndsvr_close) this->sndsvr_close();
 		if (this->data) {
 			free(this->data);
@@ -214,7 +213,7 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 
 		this->data    = malloc(this->size);
 
-		scuep_logf("Buffer memory usage: %i KB\n", this->size / 1024);
+		log_info("Buffer memory usage: %i KB", this->size / 1024);
 
 		if (1) {
 			for (int i = 0; i < this->size; i++)
@@ -233,10 +232,10 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 			this->head.ring  = this->tail.ring;
 			this->head.ring %= this->frames;
 		}
-		scuep_logf("Soft reconfig (flush %i)\n", flush);
+		log_info("Soft reconfig (flush %i)", flush);
 	}
 
-	scuep_logf("Buffer time: %f seconds\n", this->frames / (float)param->sample_rate);
+	log_info("Buffer time: %f seconds", this->frames / (float)param->sample_rate);
 
 	return 0;
 }
@@ -262,7 +261,8 @@ void decoder_free(void)
 
 int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 {
-	scuep_logf("Decoder load %i seek %f\n", track_id, seek);
+	log_info("--------------");
+	log_info("Decoder load: TrackID %i, Seek %f", track_id, seek);
 	struct DecoderState *this = &player->av;
 	int ret = 0;
 
@@ -271,19 +271,21 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	player->head.track_id = track_id;
 
 	this->track     = track_load(track_id);
+	log_info("URI: %s", this->track->uri);
+	log_info("Title: %s [%s]", this->track->title, this->track->album);
 	if (!this->track){
-		scuep_logf("Failed to load track (database error?)\n");
+		log_error("Failed to load track (database error?)");
 		return -1;
 	}
 	struct ScuepTrack *track = this->track;
 
 	if (avformat_open_input(&this->format, track->path, NULL, NULL) != 0) {
-		scuep_logf("Could not open file '%s'\n", track->path);
+		log_error("Could not open file '%s'", track->path);
 		return -1;
 	}
 
 	if (avformat_find_stream_info(this->format, NULL) < 0) {
-		scuep_logf("Could not retrieve stream info from file '%s'\n", track->path);
+		log_error("Could not retrieve stream info from file '%s'", track->path);
 		return -1;
     }
 
@@ -291,7 +293,7 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	 * SELECT STREAM *
 	 *****************/
 
-	scuep_logf("Track has %i stream(s)\n", this->format->nb_streams);
+	log_info("  Track has %i stream(s)", this->format->nb_streams);
     int stream_index = -1;
     for (int i = 0; i < this->format->nb_streams; i++)
 	{
@@ -299,11 +301,11 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 
 		const char *stream_type = av_get_media_type_string( type ); // Leak??
 
-		scuep_logf( "Stream %i type: %s\n", i, stream_type);
+		log_info("    Stream %i type: %s", i, stream_type);
         if (type == AVMEDIA_TYPE_AUDIO) stream_index = i;
     }
 	if (stream_index== -1){
-		scuep_logf( "No suitable stream!\n");
+		log_error("No suitable stream!");
 		return -1;
 	}
 
@@ -319,7 +321,7 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
 
 	if (track->length < 1) {
-		scuep_logf("Recalculating duration...\n");
+		log_info("Recalculating duration...");
 		int64_t recalc_dur =  av_rescale_q(
 			this->stream->duration,
 			this->stream->time_base,
@@ -331,8 +333,8 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	int __seek   = seek * sample_rate;
 	int __start  = track->start   * (sample_rate/1000.0f) + __seek;
 	int __length = track->length  * (sample_rate/1000.0f) - __seek;
-	scuep_logf("Frames: %i + %i, seek %i\n", __start, __length, __seek);
-	scuep_logf("Period mod: %i\n", __length % 1024);
+	log_info("Frames: %i + %i, seek %i", __start, __length, __seek);
+	log_info("Period mod: %i", __length % 1024);
 
 	int64_t seek_to = av_rescale_q(
 			__start,
@@ -361,34 +363,34 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	int sizeof_sample = av_get_bytes_per_sample(param->format);
 	int channels    = param->ch_layout.nb_channels;
 	if (channels != 2) {
-		scuep_logf("Channel count of %i is not yet supported", channels);
+		log_error("Channel count of %i is not yet supported", channels);
 		goto error;
 	}
 
 	{ // Print info about codecs and stuff
 		const char *format_str = av_get_sample_fmt_name(param->format);
-		scuep_logf( "%ihz %ic %s (%ib) %s\n",
+		log_info("%ihz %ic %s (%ib) %s",
 				param->sample_rate,
 				channels,
 				format_str,
 				sizeof_sample,
 				this->codec->long_name
 			);
-		scuep_logf("Timebase: %i / %i\n", this->stream->time_base.den, this->stream->time_base.num);
+		log_info("Timebase: %i / %i", this->stream->time_base.den, this->stream->time_base.num);
 	}
 
 	/**************
 	 * OPEN AUDIO *
 	 **************/
 
-	scuep_logf("Open audio\n");
+	log_info("Opening audio ...");
 
 	player->head.state_key = key;
 	player->head.stream_length = this->track->length;
 
 	ret = player_reconfig(param, !preload);
 	if (!ret)
-		scuep_logf("Reconfig ok\n");
+		log_info("Reconfig ok");
 	else
 		goto error;
 
@@ -398,8 +400,6 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	decoder_start();
 	return 0;
 error:
-	scuep_logf("Error happened (decoder_load)!\n");
-	print_averr(ret);
 	if (preload) player->preload_failed = true;
 	return -1;
 }
@@ -415,7 +415,7 @@ void decoder_stop(void)
 {
 	struct DecoderState *this  = &player->av;
 	if (this->thread_run) {
-		scuep_logf("Stopping decoder thread\n");
+		log_info("Stopping decoder thread");
 		this->thread_run = 0;
 		thrd_join(this->thread, NULL);
 	}
@@ -428,7 +428,7 @@ int decoder_loop(void*arg)
 	struct ScuepTrack   *track = this->track;
 	int ret = 0;
 
-	scuep_logf("Decode thread started\n");
+	log_info("Decode thread started");
 
 	AVCodecParameters *param = this->stream->codecpar;
 	int32_t sample_rate = param->sample_rate;
@@ -442,6 +442,7 @@ int decoder_loop(void*arg)
 		ret = av_read_frame(this->format, this->packet);
 		if (ret < 0) switch (ret) {
 		case AVERROR_EOF:
+			log_debug("Unexpected EOF");
 			goto finish;
 		default:
 			goto error;
@@ -452,7 +453,7 @@ int decoder_loop(void*arg)
 
 		ret = avcodec_send_packet( this->codec_ctx, this->packet );
 		if (ret < 0) {
-			scuep_logf("Send broke! %i\n", ret);
+			log_error("Send broke! %i", ret);
 			goto error;
 		}
 
@@ -485,12 +486,12 @@ finish:
 	debug.decoder_quit = false;
 	player->head.done = true;
 	av_packet_unref(this->packet);
-	scuep_logf("Decoder quit!\n");
+	log_info("Decoder quit!");
 	this->thread_run = 0;
 	return 0;
 error:
 	av_packet_unref(this->packet);
-	scuep_logf("Error happened (decoder_loop)!\n");
+	log_error("Error happened (decoder_loop)!");
 	this->thread_run = 0;
 	print_averr(ret);
 	return -1;

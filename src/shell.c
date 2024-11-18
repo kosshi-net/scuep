@@ -2,7 +2,7 @@
 #include "util.h"
 #include "player.h"
 #include "frontend.h"
-
+#include "log.h"
 
 void shell_run_w(const wchar_t* cmd)
 {
@@ -40,5 +40,20 @@ void shell_run(const char* cmd)
 		frontend_set_search(L"");
 		return;
 	}
+
+	if (scuep_prefix("log_warn ", cmd)){
+		frontend_print(SCUEP_WARN, cmd+9);
+		return;
+	}
+	if (scuep_prefix("log_debug ", cmd)){
+		frontend_print(SCUEP_DEBUG, cmd+10);
+		return;
+	}
+	if (scuep_prefix("log_error ", cmd)){
+		frontend_print(SCUEP_ERROR, cmd+10);
+		return;
+	}
+
+	frontend_print(SCUEP_ERROR, "No such command");
 }
 

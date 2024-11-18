@@ -117,8 +117,8 @@ int build_config_paths(void)
 		mkdir( path_config_folder, 0700 );
 	}
 
-	scuep_logf("%s\n", path_config_folder);
-	scuep_logf("%s\n", path_database);
+	log_info("%s", path_config_folder);
+	log_info("%s", path_database);
 
 	return 0;
 }
@@ -155,11 +155,11 @@ int main(int argc, char **argv)
 				input_file = read_stdin();
 				break;
 			case flag_debug:
-				scuep_log_start();
+				log_start();
 				break;
 			case flag_reset:
 				unlink(path_database);
-				scuep_logf("Database reset\n");
+				log_info("Database deleted");
 				break;
 			default:
 				/* Assume its a file */
@@ -242,10 +242,10 @@ void load_playlist(char *playlist)
 		 */
 		track_id = track_by_uri(uri);
 
-		scuep_logf("track_id %i\n", track_id);
+		log_info("track_id %i", track_id);
 
 		if( track_id > -1){
-			scuep_logf("track_id found %i, skip \n", track_id);
+			log_info("track_id found %i, skip", track_id);
 			playlist_push(track_id);
 			goto skip;
 		}
@@ -332,7 +332,7 @@ void load_playlist(char *playlist)
 
 		/* If metadata failed to load, use filename instead */
 		if( !track.title[0] )  track.title = scuep_basename(uri);
-		scuep_logf( "%s // %s // %s // %i - %is, #%i\n", \
+		log_info( "%s // %s // %s // %i - %is, #%i\n", \
 			track.title,
 			track.artist,
 			track.album,

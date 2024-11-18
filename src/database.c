@@ -47,12 +47,12 @@ int prepare (sqlite3_stmt **stmt, const char *sql)
 
 	if (rc == SQLITE_OK) {
 		stmt_list[stmt_list_count++] = stmt;
-		scuep_logf("Prepared %s\n", sql);
+		log_info("Prepared %s", sql);
 		return rc;
 	}
 
-	scuep_logf("During statement: %s", sql);
-	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
+	log_error("During statement: %s", sql);
+	log_error("Prepare error: %s", sqlite3_errmsg(db));
 
 	return rc;
 }
@@ -68,7 +68,7 @@ int db_initialize( char* _path_database )
 
 	int rc = sqlite3_open(path_database, &db);
 	if (rc != SQLITE_OK) {
-		scuep_logf("Cannot open %s\n", path_database);
+		log_error("Cannot open %s", path_database);
 		return 1;
 	}
 
@@ -109,7 +109,7 @@ int db_stmt_finalize_all(void)
 		*stmt_list[i] = NULL;
 	}
 
-	scuep_logf("Finalized %i\n", stmt_list_count);
+	log_info("Finalized %i", stmt_list_count);
 	stmt_list_count = 0;
 	return 0;
 }
@@ -124,7 +124,7 @@ int db_check(void)
 
 int db_reset(void)
 {
-	scuep_logf("Database reset\n");
+	log_info("Database reset");
 
 	db_terminate();
 	remove(path_database);
@@ -156,7 +156,7 @@ int db_reset(void)
 
 	db_intvar_store("version", SCUEP_FORMAT_VERSION);
 	int read_ver = db_intvar_load("version");
-	scuep_logf("DB Version %i\n", read_ver);
+	log_info("DB Version %i", read_ver);
 	return read_ver != SCUEP_FORMAT_VERSION;
 
 }
@@ -178,7 +178,7 @@ int db_prepare(void)
 	return 0;
 
 	error:
-	scuep_logf("Prepare error: %s\n", sqlite3_errmsg(db));
+	log_error("Prepare error: %s", sqlite3_errmsg(db));
 	return 1;
 
 }
@@ -468,12 +468,12 @@ int track_store( struct ScuepTrack *track )
 		track->  album
 	);
 
-	scuep_logf("track_store: %i %i\n", artist_id, album_id);
+	log_info("track_store: %i %i", artist_id, album_id);
 
 	int rc;
 	int k = 1;
 
-	scuep_logf("store uri %s\n", track->uri);
+	log_info("store uri %s", track->uri);
 
 	stmt=stmt_ins_track;
 	rc=(sqlite3_bind_text(stmt, k++, track->uri,      -1, NULL)

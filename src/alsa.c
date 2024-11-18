@@ -55,7 +55,7 @@ int alsa_open(struct PlayerState *_player)
 	snd_pcm_format_t format = format_av2alsa( player->format );
 
 	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
-        scuep_logf("Playback open error: %s\n", snd_strerror(err));
+        log_error("Playback open error: %s", snd_strerror(err));
 		goto error;
     }
 
@@ -68,14 +68,14 @@ int alsa_open(struct PlayerState *_player)
 		/* latency       */ 50000
 		) ) < 0
 	){
-		scuep_logf("Playback open error: %s\n", snd_strerror(err));
+		log_error("Playback open error: %s", snd_strerror(err));
 		goto error;
     }
 
 	player->sndsvr_close = alsa_close;
 	thrd_create(&thread, &alsa_loop, NULL);
 
-	scuep_logf("Alsa open OK\n");
+	log_info("Alsa open OK");
 
 	return 0;
 	error:
@@ -102,7 +102,7 @@ int alsa_close(void)
 
 int alsa_loop(void*arg)
 {
-	scuep_logf("ALSA Thread open\n");
+	log_info("ALSA Thread open");
 	thread_run = 1;
 
 	player->tail.track_id       = player->head.track_id;
@@ -147,18 +147,17 @@ int alsa_loop(void*arg)
 				player->data + tail * player->sizeof_frame,
 				total
 			);
-			//scuep_logf("PCM FRAMES %li %li\n", frames, total);
 			if (frames < 0) break;
 			total -= frames;
 		}
 
 		if (frames < 0) {
 			// TODO Proper error handling !
-			scuep_logf("Alsa error %s\n", snd_strerror(frames));
+			log_error("Alsa error %s", snd_strerror(frames));
 			//snd_pcm_prepare(pcm);
 			int ok = snd_pcm_recover(pcm, frames, 0);
 			if (!ok) {
-				scuep_logf("Failed to recover. State undefined.\n");
+				log_error("Failed to recover. State undefined.");
 			}
 			continue;
 		}
@@ -176,7 +175,7 @@ int alsa_loop(void*arg)
 
 	player->sndsvr_close = NULL;
 	thread_run = 0;
-	scuep_logf("ALSA Thread close\n");
+	log_info("ALSA Thread close");
 	player->pause = 1;
 	return 0;
 }

@@ -48,7 +48,7 @@ static void queue_redraw(int elem);
 static void poll_remote(void);
 static void layout_update(void);
 static void poll_remote(void);
-static void prompt_set_prefix(char *str);
+static void prompt_set_prefix(const char *str);
 static void frontend_search(int dir);
 static void prompt_clear(void);
 static void input_prompt(int key);
@@ -120,8 +120,9 @@ static struct {
 	} search;
 
 	struct {
-		/* Visual prompt label, eg ":" or "/" */
-		wchar_t prefix[512];
+		/* Visual prompt label, eg ":" or "/". Also used for responses */
+		wchar_t prefix[1024];
+		uint32_t prefix_color;
 
 		/* UTF-8 input staging buffer, flushed to widechar buffer */
 		uint32_t c_len;
@@ -186,6 +187,8 @@ int frontend_initialize(const char *fifopath)
 	init_pair(4, COLOR_RED, -1);
 	init_pair(5, COLOR_BLACK, COLOR_WHITE);
 	init_pair(6, COLOR_BLACK, 12);
+	init_pair(7, COLOR_BLACK, 14); /* Warn, black on yellow */
+	init_pair(8, 15, COLOR_RED); /* Error, white on red */
 
 	this.playlist_items = playlist_count();
 
@@ -332,7 +335,7 @@ void input(void)
 				queue_redraw(ELEMENT_CAROUSEL); /* For search highlighting */
 				break;
 			default:
-				scuep_logf("Invalid input mode, resetting to default\n");
+				log_warn("Invalid input mode, resetting to default");
 				this.input_mode = MODE_DEFAULT;
 				break;
 		}
@@ -453,7 +456,6 @@ void input_default(int key)
 
 void input_prompt(int key)
 {
-	scuep_logf("%i\n", key);
 	switch (key) {
 		case KEY_ESCAPE:
 			this.input_mode = MODE_DEFAULT;
@@ -508,7 +510,7 @@ void input_prompt(int key)
 */
 
 
-void prompt_set_prefix(char *str)
+void prompt_set_prefix(const char *str)
 {
 	mbstowcs(this.cmd.prefix, str, LENGTH(this.cmd.prefix)-1);
 }
@@ -522,9 +524,9 @@ void prompt_set_prefix_w(wchar_t *str)
 
 void prompt_clear_c(void)
 {
+	this.cmd.prefix_color = SCUEP_INFO;
 	memset(this.cmd.c, 0, sizeof(this.cmd.c));
 	this.cmd.c_len = 0;
-	scuep_logf("cmd.c cleared\n");
 }
 
 
@@ -535,6 +537,14 @@ void prompt_clear(void)
 	this.cmd.w_len = 0;
 	this.cmd.cursor = 0;
 	queue_redraw(ELEMENT_PROMPT);
+}
+
+
+void frontend_print(uint32_t color, const char *msg)
+{
+	prompt_clear();
+	prompt_set_prefix(msg);
+	this.cmd.prefix_color = color;
 }
 
 
@@ -552,18 +562,14 @@ void prompt_delete(int32_t pos)
 
 void prompt_insert(char c)
 {
-	scuep_logf("Insert %i to %i\n", c, this.cmd.c_len);
 	this.cmd.c[this.cmd.c_len++] = c;
 
 	wchar_t w[128];
 	size_t ret = mbstowcs(w, this.cmd.c, LENGTH(w));
 
 	if (ret == -1) {
-		scuep_logf("cmd.c invalid\n");
 		return;
 	}
-
-	scuep_logf("String valid: [%s], committing\n", this.cmd.c);
 
 	this.cmd.w_len += ret;
 	for (int32_t i = this.cmd.w_len+ret; i > this.cmd.cursor; i--) {
@@ -837,7 +843,7 @@ void draw_carousel(void)
 		}
 
 		if (w-title_min > artist_min) {
-			mbstowcs(wctext, track->artist, 1023);
+			mbstowcs(wctext, track->artist, 1023); // TODO !!!!
 			r += artist_min;
 			carousel_text(row, term_cols-r, artist_min, wctext, flags);
 			w -= artist_min;
@@ -948,7 +954,23 @@ void draw_prompt(void)
 {
 	move(layout.prompt, 0);
 	clrtoeol();
+
+	int pair = 0;
+
+	switch (this.cmd.prefix_color) {
+	case SCUEP_DEBUG:
+		pair = 6;
+		break;
+	case SCUEP_WARN:
+		pair = 7;
+		break;
+	case SCUEP_ERROR:
+		pair = 8;
+		break;
+	}
+	if (pair) attron(COLOR_PAIR(pair));
 	mvprintw(layout.prompt, 0, "%S", this.cmd.prefix);
+	if (pair) attroff(COLOR_PAIR(pair));
 
 	for (int32_t i = 0; i <= this.cmd.w_len; i++) {
 		wchar_t wc = this.cmd.w[i];
