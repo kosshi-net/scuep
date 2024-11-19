@@ -799,7 +799,7 @@ void draw_carousel(void)
 	static wchar_t wctext[1024] = {0};
 
 	int items = playlist_count();
-	int center = MIN( term_rows/2, this.cursor+layout.carousel[0] );
+	int center = MIN((term_rows-1)/2, this.cursor+layout.carousel[0]);
 	int row = 0;
 
 	for (int i = this.cursor-center; i < items; i++) {
