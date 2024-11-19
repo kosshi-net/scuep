@@ -418,6 +418,7 @@ void input_default(int key)
 
 		case 'v':
 			player_stop();
+			queue_redraw(ELEMENT_CAROUSEL);
 			break;
 
 		case 'c':
@@ -669,8 +670,10 @@ void frontend_next(int32_t num)
 
 void cursor_lock(void)
 {
+	int32_t key = player_state_key();
+	if (key < 0) return;
 	this.cursor_locked = true;
-	this.cursor = player_state_key();
+	this.cursor = key;
 }
 
 
