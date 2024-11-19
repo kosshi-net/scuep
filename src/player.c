@@ -107,8 +107,16 @@ int player_load(TrackId track_id, uint32_t key, bool preload)
 {
 	if (!player)
 		player_init();
-	decoder_load(track_id, 0.0, key, preload);
-	if (!player->sndsvr_close) alsa_open( player );
+
+	if (decoder_load(track_id, 0.0, key, preload)) {
+		if (!preload)
+			player_stop();
+		return -1;
+	}
+
+	if (!player->sndsvr_close)
+		alsa_open(player);
+
 	return 0;
 }
 

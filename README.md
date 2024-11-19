@@ -24,7 +24,6 @@ Other issues, bugs, & TODO
 - `wchar_t` must be UTF-32, behavior with UTF-16 is undefined (does ncursesw even handle UTF-16?)
 - Decoder edge case bugs
 	- Seeking while paused does not work correctly
-- Segfault on missing cached files
 - Player does warn about running multiple instances leading to weird behavior
 - libcue has some minor issues, write your own cue sheet parser?
 - Undefined behavior when gaplessly playing tracks shorter than the ring buffer
