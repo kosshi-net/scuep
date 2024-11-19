@@ -51,3 +51,29 @@ $(sql_h): $(sql)
 clean:
 	rm $(obj) $(sql_h) bin/scuep-cue-to-urls bin/scuep
 
+install: all
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	cp \
+		"bin/scuep" \
+		"bin/scuep-remote" \
+		"bin/scuep-cue-scanner" \
+		"bin/scuep-media-scanner" \
+		"bin/scuep-dedup" \
+		"bin/scuep-cue-to-urls" \
+		$(DESTDIR)$(PREFIX)/bin
+	chmod 755 \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep"
+
+uninstall:
+	rm -f \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-media-scanner" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-cue-to-urls" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-remote" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep-dedup" \
+		"$(DESTDIR)$(PREFIX)/bin/scuep"
