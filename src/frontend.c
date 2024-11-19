@@ -359,7 +359,7 @@ void input_default(int key)
 		case '/':
 			prompt_clear();
 			this.input_mode = MODE_SEARCH;
-			prompt_set_prefix((char)key == '?' ? "?" : "/");
+			prompt_set_prefix((char[2]) {key, '\0'});
 			break;
 
 		case 'n':
