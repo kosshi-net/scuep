@@ -355,10 +355,11 @@ void input_default(int key)
 			prompt_set_prefix(":");
 			break;
 
+		case '?':
 		case '/':
 			prompt_clear();
 			this.input_mode = MODE_SEARCH;
-			prompt_set_prefix("/");
+			prompt_set_prefix((char)key == '?' ? "?" : "/");
 			break;
 
 		case 'n':
@@ -745,9 +746,9 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 	wchar_t *needle     = this.search.w;
 	uint32_t needle_len = wcslen(needle);
 
-	if (this.cmd.prefix[0] == '/' && this.cmd.w_len > 0) {
-		needle     = this.cmd.w;
-		needle_len = this.cmd.w_len;
+	if (this.input_mode == MODE_SEARCH && this.cmd.w_len > 0) {
+		needle       = this.cmd.w;
+		needle_len   = this.cmd.w_len;
 	}
 
 	if (needle_len) {
