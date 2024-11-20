@@ -92,7 +92,6 @@ static int term_cols = 0;
 static int term_rows = 0;
 static int debug_mode = 0;
 
-static SCREEN *screen = NULL;
 
 static struct {
 	int32_t pad[2];
@@ -105,6 +104,8 @@ static struct {
 
 /* The "this" struct */
 static struct {
+	SCREEN *screen;
+
 	int32_t input_repeat;
 	bool    should_quit;
 
@@ -124,7 +125,8 @@ static struct {
 		wchar_t prefix[1024];
 		uint32_t prefix_color;
 
-		/* UTF-8 input staging buffer, flushed to widechar buffer */
+		/* UTF-8 input staging buffer, flushed to widechar buffer when it's a
+		 * valid UTF-8 string. */
 		uint32_t c_len;
 		char     c[128];
 
@@ -151,7 +153,6 @@ static struct {
 	} input_mode;
 
 } this = {
-	.cursor_locked = false,
 	.input_mode = MODE_DEFAULT,
 };
 
@@ -170,7 +171,7 @@ int frontend_initialize(const char *fifopath)
 	const char *term_type = getenv("TERM");
 	FILE* term_in = fopen("/dev/tty", "r");
 
-	screen = newterm(term_type, stdout, term_in);
+	this.screen = newterm(term_type, stdout, term_in);
 
 	cbreak();
 	noecho();              /* Input echo */
@@ -253,8 +254,6 @@ int frontend_tick(void)
 	 */
 	struct PlayerState *player = _get_playerstate();
 	if (player) {
-
-
 		if (player->head.done
 		&&  player->head.total - player->tail.total == 0
 		&& !player->pause
@@ -386,14 +385,12 @@ void input_default(int key)
 
 		case 'L':
 			/* Preload track, debugging purposes */
-			{
-				player_load( playlist_track( this.cursor+1 ), this.cursor, true);
-				cursor_lock();
-			}
+			player_load( playlist_track(this.cursor+1), this.cursor, true);
+			cursor_lock();
 			break;
 
 		case KEY_RIGHT:
-			player_seek_relative( 5.0);
+			player_seek_relative(+5.0);
 			break;
 		case KEY_LEFT:
 			player_seek_relative(-5.0);
@@ -431,7 +428,7 @@ void input_default(int key)
 			cursor_free();
 			this.cursor -= MAX(1, this.input_repeat);
 			this.input_repeat = 0;
-			this.cursor = ( this.playlist_items + this.cursor ) % this.playlist_items;
+			this.cursor = (this.playlist_items + this.cursor) % this.playlist_items;
 			queue_redraw(ELEMENT_CAROUSEL);
 			break;
 		case 'j':
@@ -439,7 +436,7 @@ void input_default(int key)
 			cursor_free();
 			this.cursor += MAX( 1, this.input_repeat );
 			this.input_repeat = 0;
-			this.cursor = ( this.playlist_items + this.cursor ) % this.playlist_items;
+			this.cursor = (this.playlist_items + this.cursor) % this.playlist_items;
 			queue_redraw(ELEMENT_CAROUSEL);
 			break;
 		case 'q':
@@ -566,8 +563,8 @@ void prompt_insert(char c)
 {
 	this.cmd.c[this.cmd.c_len++] = c;
 
-	wchar_t w[128];
-	size_t ret = mbstowcs(w, this.cmd.c, LENGTH(w));
+	wchar_t w[1024];
+	size_t ret = mbstowcs(w, this.cmd.c, LENGTH(w)-1);
 
 	if (ret == -1) {
 		return;
@@ -597,7 +594,7 @@ void prompt_insert(char c)
 
 void frontend_set_search(wchar_t *str)
 {
-	wcsncpy(this.search.w, str, LENGTH(this.search.w)-1);
+	wcsncpy (this.search.w, str,           LENGTH(this.search.w)-1);
 	wcstombs(this.search.c, this.search.w, LENGTH(this.search.c)-1);
 }
 
@@ -653,9 +650,9 @@ void frontend_play(int id)
 
 void frontend_next(int32_t num)
 {
-	int32_t active = player_state_key() + num;
-	active = ( this.playlist_items + active ) % this.playlist_items;
-	frontend_play(active);
+	int32_t item = player_state_key() + num;
+	item = (this.playlist_items + item) % this.playlist_items;
+	frontend_play(item);
 }
 
 
@@ -733,7 +730,7 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 		col -= total;
 	}
 
-	if (flags & CAROUSEL_PRINT_FOCUSED) { 
+	if (flags & CAROUSEL_PRINT_FOCUSED) {
 		attron(COLOR_PAIR(1));
 	}
 	mvprintw(row, col, "%S", wccut);
@@ -847,14 +844,14 @@ void draw_carousel(void)
 		}
 
 		if (w-title_min > artist_min) {
-			mbstowcs(wctext, track->artist, 1023); // TODO !!!!
+			mbstowcs(wctext, track->artist, LENGTH(wctext)-1);
 			r += artist_min;
 			carousel_text(row, term_cols-r, artist_min, wctext, flags);
 			w -= artist_min;
 			w -= 2; /* Leave a gap between title and artist */
 		}
 
-		mbstowcs(wctext, track->title, 1023);
+		mbstowcs(wctext, track->title, LENGTH(wctext)-1);
 		carousel_text(row, l, w, wctext, flags);
 
 		track_free(track);
@@ -881,7 +878,6 @@ void draw_debug(void)
 
 	mvprintw(layout.debug, term_cols/2-3, " Debug " );
 
-
 	if (!player) {
 		mvprintw(layout.debug+1,0, "%s", "Player uninitialized" );
 	} else {
@@ -902,8 +898,8 @@ void draw_debug(void)
 			player_position_seconds(),
 			player_duration_seconds(),
 			player->head.ring,
-			player->tail.ring
-			,player->head.total - player->tail.total
+			player->tail.ring,
+			player->head.total - player->tail.total
 		);
 		mvprintw(layout.debug+3,0,
 			"Input mode: %i, cursor: %i",
@@ -933,7 +929,7 @@ void draw_progress(void)
 	);
 
 	int32_t r = strlen(buf) + layout.pad[0] + 2;
-	int32_t l = term_cols - layout.pad[0];
+	int32_t l = term_cols   - layout.pad[0];
 
 	mvprintw(layout.progress, layout.pad[0], "%s", buf);
 

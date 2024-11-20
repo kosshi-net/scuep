@@ -9,8 +9,8 @@
 
 static bool enable_logging = false;
 
-static char     buffer[1024];
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static char buffer[1024];
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void log_start(void)
 {
@@ -53,7 +53,5 @@ void scuep_logf(uint32_t type, const char *format, ...)
 
 	pthread_mutex_unlock(&mutex);
 }
-
-
 
 

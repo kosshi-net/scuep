@@ -15,13 +15,12 @@
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-//#include <libswresample/swresample.h>
 
 /*
  * Function declarations
  */
 static int  decoder_load(TrackId, float, uint32_t, bool);
-static int  player_write( AVFrame*, int, int );
+static int  player_write(AVFrame*, int, int );
 static int  decoder_loop(void*arg);
 static void decoder_start(void);
 static void decoder_stop(void);
@@ -68,6 +67,9 @@ void print_averr(int err)
  *
  * Conversion from samples to ffmpeg's timebase is nice with av_rescale_q,
  * should scueptrack timestamps be samples as well?
+ *
+ * ^^^ YES THEY SHOULD! Storing it as milliseconds is not precise enough for
+ * gapless playback! TODO TODO TODO !!!!
  */
 
 void player_init(void)
@@ -126,7 +128,7 @@ int player_seek(float seconds)
 	if (!this) return -1;
 
 	decoder_load(this->tail.track_id, seconds, this->tail.state_key, false);
-	if (!player->sndsvr_close) alsa_open( player );
+	if (!player->sndsvr_close) alsa_open(player);
 	return 0;
 }
 
@@ -149,9 +151,9 @@ float player_position_seconds(void)
 	struct PlayerState *this = player;
 	if (!this) return 0.0f;
 
-	float pos = this->tail.total   -
-	            this->tail.stream_changed  +
-	            this->tail.stream_offset;
+	float pos = this->tail.total
+	          - this->tail.stream_changed
+	          + this->tail.stream_offset;
 	return pos / (float) this->sample_rate;
 }
 
@@ -219,19 +221,19 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 		this->sizeof_frame  = this->sizeof_sample * this->channels;
 		this->size          = this->frames * this->sizeof_frame;
 
-		this->data    = malloc(this->size);
+		this->data = malloc(this->size);
 
 		log_info("Buffer memory usage: %i KB", this->size / 1024);
 
-		if (1) {
-			for (int i = 0; i < this->size; i++)
-				this->data[i] = rand();
+		/* Fills buffer with white noise, useful for debugging */
+		if (0) {
+			for (int i = 0; i < this->size; i++) this->data[i] = rand();
 		}
+
 		this->head.ring = 0;
 		this->tail.ring = 0;
 		this->head.total = 0;
 		this->tail.total = 0;
-
 	} else {
 		if (flush
 		 && this->head.total > this->tail.total
@@ -277,14 +279,16 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 	decoder_free();
 
 	player->head.track_id = track_id;
+	this->track = track_load(track_id);
 
-	this->track     = track_load(track_id);
 	log_info("URI: %s", this->track->uri);
 	log_info("Title: %s [%s]", this->track->title, this->track->album);
+
 	if (!this->track){
 		log_error("Failed to load track (database error?)");
 		return -1;
 	}
+
 	struct ScuepTrack *track = this->track;
 
 	if (avformat_open_input(&this->format, track->path, NULL, NULL) != 0) {
@@ -303,16 +307,15 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 
 	log_info("  Track has %i stream(s)", this->format->nb_streams);
     int stream_index = -1;
-    for (int i = 0; i < this->format->nb_streams; i++)
-	{
+
+    for (int i = 0; i < this->format->nb_streams; i++) {
 		enum AVMediaType type = this->format->streams[i]->codecpar->codec_type;
-
 		const char *stream_type = av_get_media_type_string( type ); // Leak??
-
 		log_info("    Stream %i type: %s", i, stream_type);
         if (type == AVMEDIA_TYPE_AUDIO) stream_index = i;
     }
-	if (stream_index== -1){
+
+	if (stream_index == -1) {
 		log_error("No suitable stream!");
 		return -1;
 	}
@@ -335,7 +338,7 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 			this->stream->time_base,
 			sample_scale
 		);
-		this->track->length = recalc_dur / (sample_rate) * 1000.0f - track->start;
+		this->track->length = recalc_dur / ((float)sample_rate) * 1000.0f - track->start;
 	}
 
 	int __seek   = seek * sample_rate;
@@ -369,7 +372,7 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 
 
 	int sizeof_sample = av_get_bytes_per_sample(param->format);
-	int channels    = param->ch_layout.nb_channels;
+	int channels      = param->ch_layout.nb_channels;
 	if (channels != 2) {
 		log_error("Channel count of %i is not yet supported", channels);
 		goto error;
@@ -403,8 +406,8 @@ int decoder_load(TrackId track_id, float seek, uint32_t key, bool preload)
 		goto error;
 
 	player->preload_failed = false;
-	player->head.stream_changed  = player->head.total;
-	player->head.done     = 0;
+	player->head.stream_changed = player->head.total;
+	player->head.done = 0;
 	decoder_start();
 	return 0;
 error:
@@ -414,14 +417,14 @@ error:
 
 void decoder_start(void)
 {
-	struct DecoderState *this  = &player->av;
+	struct DecoderState *this = &player->av;
 	if (!this->thread_run)
 		thrd_create( &this->thread, &decoder_loop, NULL );
 }
 
 void decoder_stop(void)
 {
-	struct DecoderState *this  = &player->av;
+	struct DecoderState *this = &player->av;
 	if (this->thread_run) {
 		log_info("Stopping decoder thread");
 		this->thread_run = 0;
@@ -431,7 +434,7 @@ void decoder_stop(void)
 
 int decoder_loop(void*arg)
 {
-	struct DecoderState *this  = &player->av;
+	struct DecoderState *this = &player->av;
 	this->thread_run = 1;
 	struct ScuepTrack   *track = this->track;
 	int ret = 0;
@@ -441,8 +444,8 @@ int decoder_loop(void*arg)
 	AVCodecParameters *param = this->stream->codecpar;
 	int32_t sample_rate = param->sample_rate;
 	AVRational sample_scale = { .den = sample_rate, .num = 1 };
-	int32_t start  = track->start   * (sample_rate*0.001) ;
-	int32_t length = track->length  * (sample_rate*0.001) ;
+	int32_t start  = track->start   * (sample_rate*0.001);
+	int32_t length = track->length  * (sample_rate*0.001);
 
 	while (this->thread_run) {
 		av_packet_unref(this->packet);
@@ -466,7 +469,7 @@ int decoder_loop(void*arg)
 		}
 
 		while (ret >= 0 && this->thread_run) {
-			ret = avcodec_receive_frame( this->codec_ctx, this->frame);
+			ret = avcodec_receive_frame(this->codec_ctx, this->frame);
 
 			int64_t sample_pos = av_rescale_q(
 					this->frame->pts,
@@ -520,8 +523,6 @@ int player_write(
 
 	uint32_t head = this->head.ring;
 
-	//scuep_logf("DECODER_WRITE %i\n", head);
-
 	/* Loop until the whole packet has been written out */
 	while (left != 0 && this->av.thread_run) {
 
@@ -538,7 +539,7 @@ int player_write(
 
 		if (interleaved) {
 			memcpy(
-				this->data      + (head     * this->sizeof_frame),
+				this->data      + (head           * this->sizeof_frame),
 				packet->data[0] + (packet_written * this->sizeof_frame),
 				available * this->sizeof_frame
 			);
@@ -550,7 +551,7 @@ int player_write(
 			for (int b = 0; b < this->sizeof_sample; b++)           // Byte
 			{
 				this->data[i++] = packet->data[c][
-					(f+packet_written) * this->sizeof_sample + b
+					(f + packet_written) * this->sizeof_sample + b
 				];
 			}
 		}

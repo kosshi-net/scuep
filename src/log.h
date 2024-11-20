@@ -21,7 +21,7 @@ void log_start(void);
 void scuep_logf(uint32_t type, const char *format, ...);
 
 
-/* Printed to stderr if --debug is enabled. Never displayed on frontend. */
+/* Printed to stderr if --debug is enabled. Never displayed on the frontend */
 #define log_info(...) \
 	scuep_logf(SCUEP_INFO, __VA_ARGS__)
 

@@ -52,7 +52,7 @@ int  db_intvar_store (const char *key, int val);
 int  transaction_begin(void);
 int  transaction_end(void);
 
-// Playlist is one indexed!!!
+// Playlist is one indexed!!! (Why???)
 
 int     playlist_count(void);
 int     playlist_clear(void);
