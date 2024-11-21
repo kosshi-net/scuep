@@ -369,6 +369,18 @@ void input_default(int key)
 			frontend_search(-1);
 			break;
 
+		case 'm':
+			{
+				int mark = playlist_get_mark(this.cursor+1);
+				if (mark > 0)
+					playlist_set_mark(this.cursor+1, 0);
+				else if (mark == 0)
+					playlist_set_mark(this.cursor+1, 1);
+
+				queue_redraw(ELEMENT_CAROUSEL);
+			}
+			break;
+
 		case 'd':
 			debug_mode = !debug_mode;
 			queue_redraw(ELEMENT_ALL);
@@ -812,15 +824,22 @@ void draw_carousel(void)
 		if (row >= layout.carousel[1]) break;
 
 		TrackId trackid = playlist_track( i+1 );
+		int mark = playlist_get_mark(i+1);
+
 		struct ScuepTrack *track = track_load(trackid);
 
 		move(row, 0);
 		clrtoeol();
 
+		if (mark > 0) {
+			mvprintw(row, 2, "*");
+		}
+
 		if (i == this.cursor) {
 			mvprintw( row, 1, "~" );
 			flags |= CAROUSEL_PRINT_FOCUSED;
 		}
+
 		if (i == player_state_key()) {
 			mvprintw( row, 1, ">" );
 		}

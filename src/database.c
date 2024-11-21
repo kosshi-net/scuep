@@ -16,8 +16,8 @@ static int db_check();
 static int db_prepare();
 static int db_stmt_finalize_all();
 
-
-#define SCUEP_FORMAT_VERSION 1
+/* Increment to reset existing databases */
+#define SCUEP_FORMAT_VERSION 2
 
 static char    *path_database;
 static sqlite3 *db;
@@ -283,7 +283,48 @@ int playlist_push( TrackId id )
 	return -1;
 }
 
+int playlist_get_mark(int index)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
 
+	rc = prepare(&stmt, "SELECT mark FROM playlist WHERE id=?1");
+	if (rc != SQLITE_OK) goto error;
+
+	rc = sqlite3_bind_int(stmt, 1, index);
+	rc = sqlite3_step(stmt);
+
+	if (rc != SQLITE_ROW) goto error;
+
+	int val = sqlite3_column_int (stmt, 0);
+
+	return val;
+
+	error:
+	fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
+
+int playlist_set_mark(int index, int mark)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+	rc = prepare(&stmt,
+		"UPDATE playlist SET mark=?1 WHERE id=?2"
+	);
+	if(rc != SQLITE_OK) goto error;
+
+	sqlite3_bind_int(stmt, 1, mark);
+	sqlite3_bind_int(stmt, 2, index);
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
+
+	return 0;
+
+	error:
+	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
 
 
 TrackId track_by_uri( const char* uri )

@@ -59,4 +59,8 @@ int     playlist_clear(void);
 int     playlist_push (TrackId);
 TrackId playlist_track(int);
 
+int    playlist_get_mark(int);
+int    playlist_set_mark(int, int);
+
+
 #endif

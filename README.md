@@ -13,7 +13,6 @@ This is a near full rewrite of scuep. Largest differences to legacy brach:
 
 Unimplemented features
 - Many legacy commands
-- Selections
 - Volume control
 - Playlist editing
 
@@ -50,6 +49,7 @@ TODO. See legacy branch for more information.
 | :              | Enter command (see Commands)  |
 | /              | Search  |
 | n, N           | Find next or prev track matching search |
+| m              | Mark or unmark track |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | d              | (DEBUG) Toggle debug panel |
