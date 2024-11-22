@@ -1,20 +1,37 @@
-# SCUEP - Simple CUE Player
-A simple terminal music player for GNU/Linux.
+# WIP!! This is a rewrite branch !!
 
-## WIP!! - Rewrite branch
-This is a near full rewrite of scuep. Largest differences to legacy brach:
-- Custom multithreaded audio backend using libavcodec (ffmpeg)
-    - Supports gapless playback (where formats allow)
-	- Unprocessed audio, compatibility (resampling) relegated to sound server
-- SQLite as a metadata cache
-	- Import and storage is far more robust and much faster than before
-	- Instant cold start
-- Much nicer modular design
+# SCUEP - Simple CUE Player
+A simple playlist oriented terminal music player.
+
+Scuep is a minimal but powerful playlist-oriented music player, designed to be
+as intuitive to use as possible. Fundamentally it operates much like sxiv; you
+give it a list of files (a playlist!), and scuep will just play them for you,
+while also offering features to filter and edit said playlist.
+
+Originally the purpose of it was just to play CUE+TTA properly, thus the name.
+But it has grown to be much more general and powerful than that.
+
+## Features
+Note: Some listed features may be incomplete or buggy
+
+- Supports most filetypes (anything ffmpeg supports)
+- CUE sheet support
+- Gapless playback
+- Instant startup (SQLite metadata cache)
+- Sxiv-like marking/selecting system
+- Vi-like commands
+- Vi-like search
+- Playlist editing and deduplication features
+- Solid unicode support
 
 Unimplemented features
 - Many legacy commands
 - Volume control
-- Playlist editing
+- Some playlist editing functions
+    - Reordering
+	- Write-to-file commands
+	- In-player deduplication command
+- Configuration
 
 Other issues, bugs, & TODO
 - FFmpeg decodes to native endianess while alsa driver always assumes little-endian
@@ -32,6 +49,9 @@ Other issues, bugs, & TODO
 	- Cursor position is wrong when deletions occur (fix: use id instead of ordinal)
 - A lot more testing needed
     - Not tested on other \*nixes
+- More precise searching options (eg. album name only search, etc)
+- Manuals
+- Better shell system with tab completition
 
 ## Documentation
 TODO. See legacy branch for more information.
@@ -60,7 +80,7 @@ TODO. See legacy branch for more information.
 ### Commands
 
 These commands can be ran from the TUI by pressing `:`,
-with `scuep-remote`, or by piping them into `.config/scuep/fifo`.
+with `scuep-remote`, or by piping them into `~/.config/scuep/fifo`.
 
 | Command           | Action |
 | ---               | --- |
