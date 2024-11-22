@@ -52,12 +52,15 @@ int  db_intvar_store (const char *key, int val);
 int  transaction_begin(void);
 int  transaction_end(void);
 
-// Playlist is one indexed!!! (Why???)
+/* Playlist functions use ordinal which is zero indexed */
 
 int     playlist_count(void);
 int     playlist_clear(void);
 int     playlist_push (TrackId);
 TrackId playlist_track(int);
+
+void    playlist_delete(int);
+int playlist_delete_marked(int mark);
 
 int    playlist_get_mark(int);
 int    playlist_set_mark(int, int);

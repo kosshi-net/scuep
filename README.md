@@ -29,6 +29,7 @@ Other issues, bugs, & TODO
     - Or when stacking track preloads in general
 - Various UI improvements needed
     - Cursor behavior is erratic and laggy since gapless playback was implemented
+	- Cursor position is wrong when deletions occur (fix: use id instead of ordinal)
 - A lot more testing needed
     - Not tested on other \*nixes
 
@@ -47,13 +48,13 @@ TODO. See legacy branch for more information.
 | v              | Stop playback. Unitializes decoder and audio driver, minimizing idle resource usage |
 | b              | Play next |
 | :              | Enter command (see Commands)  |
-| /              | Search  |
+| /              | Search |
 | n, N           | Find next or prev track matching search |
 | m              | Mark or unmark track |
+| D              | Delete track(s) from playlist |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | d              | (DEBUG) Toggle debug panel |
-| D              | (DEBUG) Force decoder to quit |
 | L              | (DEBUG) Force preload a track for gapless playback |
 
 ### Commands

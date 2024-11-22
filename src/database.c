@@ -17,7 +17,7 @@ static int db_prepare();
 static int db_stmt_finalize_all();
 
 /* Increment to reset existing databases */
-#define SCUEP_FORMAT_VERSION 2
+#define SCUEP_FORMAT_VERSION 3
 
 static char    *path_database;
 static sqlite3 *db;
@@ -28,8 +28,8 @@ int            stmt_list_count = 0;
 
 /*
  * TODO
- * Error handling
- * Optimize multi-stmt queries to one (im dumb)
+ * Error handling !!!!!!!!!!!!!!
+ * Any errors here should just crash the program?
  */
 
 
@@ -240,25 +240,21 @@ int playlist_clear(void)
 		NULL // TODO add errmsg
 	);
 
+	return db_intvar_store("plc", 0);
 	return (rc != SQLITE_OK );
 }
 
 
 int playlist_count(void)
 {
-	static sqlite3_stmt *stmt;
-
-	prepare(&stmt, "SELECT COUNT(*) FROM playlist");
-	sqlite3_step(stmt);
-
-	return sqlite3_column_int(stmt, 0);
+	return db_intvar_load("plc");
 }
 
 TrackId playlist_track(int row)
 {
 	static sqlite3_stmt *stmt;
 
-	prepare(&stmt, "SELECT track_id FROM playlist WHERE id=?1");
+	prepare(&stmt, "SELECT track_id FROM playlist WHERE ordinal=?1");
 	sqlite3_bind_int(stmt, 1, row);
 	sqlite3_step(stmt);
 
@@ -266,15 +262,20 @@ TrackId playlist_track(int row)
 }
 
 
-int playlist_push( TrackId id )
+int playlist_push(TrackId id)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
-	rc = prepare(&stmt, "INSERT INTO playlist(track_id) VALUES (?1)");
-
+	rc = prepare(&stmt,
+		"INSERT INTO playlist(track_id, ordinal) VALUES (?1, ?2)"
+	);
+	int plc = playlist_count();
 	rc = sqlite3_bind_int(stmt, 1, id);
+	rc = sqlite3_bind_int(stmt, 2, plc);
 
 	rc = sqlite3_step(stmt);
+
+	db_intvar_store("plc", plc+1);
 
 	if (rc != SQLITE_DONE) goto error;
 
@@ -283,12 +284,78 @@ int playlist_push( TrackId id )
 	return -1;
 }
 
+void playlist_delete(int ordinal)
+{
+	/* TODO See if this can be done more efficiently when bulk deleting */
+
+	int rc;
+	static sqlite3_stmt *stmt_dec;
+	static sqlite3_stmt *stmt_del;
+
+	rc = prepare(&stmt_dec,
+		"UPDATE playlist "
+		"SET ordinal = ordinal - 1 "
+		"WHERE ordinal > ?1"
+	);
+	if (rc != SQLITE_OK) goto error;
+
+	rc = prepare(&stmt_del,
+		"DELETE FROM playlist "
+		"WHERE ordinal = (?1)"
+	);
+	if (rc != SQLITE_OK) goto error;
+
+	rc = sqlite3_bind_int(stmt_del, 1, ordinal);
+	rc = sqlite3_step(stmt_del);
+	if (rc != SQLITE_DONE) goto error;
+
+	rc = sqlite3_bind_int(stmt_dec, 1, ordinal);
+	rc = sqlite3_step(stmt_dec);
+	if (rc != SQLITE_DONE) goto error;
+
+	db_intvar_store("plc", playlist_count()-1);
+
+	return;
+	error:
+	log_error("Error: %s\n", sqlite3_errmsg(db));
+}
+
+int playlist_delete_marked(int mark)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+
+	/* TODO bitwise op */
+	rc = prepare(&stmt, "SELECT ordinal FROM playlist WHERE mark = ?1");
+	if (rc != SQLITE_OK) goto error;
+
+	sqlite3_bind_int(stmt, 1, mark);
+
+	rc = sqlite3_step(stmt);
+
+	int dels = 0;
+	while (rc == SQLITE_ROW) {
+		int val = sqlite3_column_int (stmt, 0);
+
+		playlist_delete(val);
+		dels++;
+
+		rc = sqlite3_step(stmt);
+	}
+	if (rc != SQLITE_DONE) goto error; /* Program state unknown, should crash */
+
+	return dels;
+	error:
+	log_error("Error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
+
 int playlist_get_mark(int index)
 {
 	int rc;
 	static sqlite3_stmt *stmt;
 
-	rc = prepare(&stmt, "SELECT mark FROM playlist WHERE id=?1");
+	rc = prepare(&stmt, "SELECT mark FROM playlist WHERE ordinal=?1");
 	if (rc != SQLITE_OK) goto error;
 
 	rc = sqlite3_bind_int(stmt, 1, index);
@@ -310,7 +377,7 @@ int playlist_set_mark(int index, int mark)
 	int rc;
 	static sqlite3_stmt *stmt;
 	rc = prepare(&stmt,
-		"UPDATE playlist SET mark=?1 WHERE id=?2"
+		"UPDATE playlist SET mark=?1 WHERE ordinal=?2"
 	);
 	if(rc != SQLITE_OK) goto error;
 

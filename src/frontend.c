@@ -264,7 +264,7 @@ int frontend_tick(void)
 		if (player->head.done && !player->preload_failed) {
 			/* Preload next track */
 			uint32_t id = (this.playlist_items+player_state_key()+1) % this.playlist_items;
-			player_load( playlist_track( id+1 ), id, true);
+			player_load( playlist_track(id), id, true);
 		}
 	}
 
@@ -371,11 +371,11 @@ void input_default(int key)
 
 		case 'm':
 			{
-				int mark = playlist_get_mark(this.cursor+1);
+				int mark = playlist_get_mark(this.cursor);
 				if (mark > 0)
-					playlist_set_mark(this.cursor+1, 0);
+					playlist_set_mark(this.cursor, 0);
 				else if (mark == 0)
-					playlist_set_mark(this.cursor+1, 1);
+					playlist_set_mark(this.cursor, 1);
 
 				queue_redraw(ELEMENT_CAROUSEL);
 			}
@@ -385,8 +385,13 @@ void input_default(int key)
 			debug_mode = !debug_mode;
 			queue_redraw(ELEMENT_ALL);
 			break;
+
 		case 'D':
-			debug_quit_decoder();
+			if (playlist_delete_marked(1) == 0) {
+				playlist_delete(this.cursor);
+			}
+			this.playlist_items = playlist_count();
+			queue_redraw(ELEMENT_ALL);
 			break;
 
 		case '\n':
@@ -397,7 +402,7 @@ void input_default(int key)
 
 		case 'L':
 			/* Preload track, debugging purposes */
-			player_load( playlist_track(this.cursor+1), this.cursor, true);
+			player_load( playlist_track(this.cursor), this.cursor, true);
 			cursor_lock();
 			break;
 
@@ -620,7 +625,7 @@ void frontend_search(int dir)
 		uint32_t index = this.cursor + dir * j;
 		index = (index+this.playlist_items) % this.playlist_items;
 
-		TrackId trackid = playlist_track(index + 1);
+		TrackId trackid = playlist_track(index);
 		struct ScuepTrack *track = track_load(trackid);
 
 		int match = (
@@ -646,7 +651,7 @@ void frontend_mark_by_search(const char *needle)
 
 	for (uint32_t i = 0; i < this.playlist_items; i++) {
 
-		TrackId trackid = playlist_track(i+1);
+		TrackId trackid = playlist_track(i);
 		struct ScuepTrack *track = track_load(trackid);
 		int match = (
 			strcasestr(track->title,  needle) ||
@@ -656,7 +661,7 @@ void frontend_mark_by_search(const char *needle)
 		track_free(track);
 
 		if (match) {
-			playlist_set_mark(i+1, 1);
+			playlist_set_mark(i, 1);
 		}
 	}
 
@@ -676,7 +681,7 @@ void frontend_mark_by_search(const char *needle)
 
 void frontend_play(int id)
 {
-	player_load( playlist_track(id+1), id, false );
+	player_load( playlist_track(id), id, false );
 	player_play();
 
 	if (this.cursor_locked) {
@@ -855,8 +860,8 @@ void draw_carousel(void)
 		if (row <  layout.carousel[0]) continue;
 		if (row >= layout.carousel[1]) break;
 
-		TrackId trackid = playlist_track( i+1 );
-		int mark = playlist_get_mark(i+1);
+		TrackId trackid = playlist_track(i);
+		int mark = playlist_get_mark(i);
 
 		struct ScuepTrack *track = track_load(trackid);
 
