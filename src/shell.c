@@ -54,6 +54,11 @@ void shell_run(const char* cmd)
 		return;
 	}
 
+	if (scuep_prefix("m/", cmd)) {
+		frontend_mark_by_search(cmd+2);
+		return;
+	}
+
 	frontend_print(SCUEP_ERROR, "No such command");
 }
 

@@ -11,6 +11,7 @@ int frontend_terminate(void);
 void frontend_next(int32_t);
 void frontend_set_search(wchar_t *str);
 
+void frontend_mark_by_search(const char *needle);
 
 void frontend_print(uint32_t level, const char*);
 

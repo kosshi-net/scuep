@@ -640,6 +640,30 @@ void frontend_search(int dir)
 }
 
 
+void frontend_mark_by_search(const char *needle)
+{
+	if (needle[0] == '\0') return;
+
+	for (uint32_t i = 0; i < this.playlist_items; i++) {
+
+		TrackId trackid = playlist_track(i+1);
+		struct ScuepTrack *track = track_load(trackid);
+		int match = (
+			strcasestr(track->title,  needle) ||
+			strcasestr(track->album,  needle) ||
+			strcasestr(track->artist, needle)
+		);
+		track_free(track);
+
+		if (match) {
+			playlist_set_mark(i+1, 1);
+		}
+	}
+
+	queue_redraw(ELEMENT_CAROUSEL);
+}
+
+
 /*
  ____  _             _                _           _        _
 |  _ \| | __ _ _   _| |__   __ _  ___| | __   ___| |_ _ __| |
@@ -761,6 +785,14 @@ void carousel_text(int row, int col, int w, wchar_t *wctext, int flags)
 	if (this.input_mode == MODE_SEARCH && this.cmd.w_len > 0) {
 		needle       = this.cmd.w;
 		needle_len   = this.cmd.w_len;
+	}
+
+	/* Highlight :m/ command */
+	if (this.input_mode == MODE_COMMAND
+	&& wcsncmp(L"m/", this.cmd.w, 2) == 0
+	){
+		needle = this.cmd.w+2;
+		needle_len = wcslen(needle);
 	}
 
 	if (needle_len) {

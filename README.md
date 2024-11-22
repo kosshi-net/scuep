@@ -67,6 +67,7 @@ with `scuep-remote`, or by piping them into `.config/scuep/fifo`.
 | `next` `skip`     | Skip track |
 | `prev`            | Previous track |
 | `noh`             | Clears search highlighting  |
+| `m/<term>`        | Mark by search |
 
 ### Command line arguments
 | Flag | Function |
