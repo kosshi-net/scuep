@@ -11,6 +11,9 @@
 
 #include <threads.h>
 
+/* Max frames to attempt to write at once. */
+#define PERIOD 1024
+
 static char *device = "default";
 static snd_pcm_t *pcm = NULL;
 
@@ -24,7 +27,7 @@ static uint8_t *silence = NULL;
 
 snd_pcm_format_t format_av2alsa(enum AVSampleFormat f)
 {
-	switch(f){
+	switch (f) {
 		case AV_SAMPLE_FMT_FLT:
 		case AV_SAMPLE_FMT_FLTP:
 			return SND_PCM_FORMAT_FLOAT_LE;
@@ -51,7 +54,7 @@ int alsa_open(struct PlayerState *_player)
 
 	alsa_close();
 
-	silence = calloc(player->period, player->sizeof_frame);
+	silence = calloc(PERIOD, player->sizeof_frame);
 	snd_pcm_format_t format = format_av2alsa( player->format );
 
 	if ((err = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
@@ -128,7 +131,7 @@ int alsa_loop(void*arg)
 
 		uint32_t tail = player->tail.ring;
 
-		int32_t total = MIN(player->head.total - player->tail.total, player->period);
+		int32_t total = MIN(player->head.total - player->tail.total, PERIOD);
 
 		/* Prevent reading outside ring buffer */
 		total = MIN(total, player->frames - tail);
@@ -136,7 +139,7 @@ int alsa_loop(void*arg)
 		if (total < 1 ||  player->pause) {
 			snd_pcm_writei(pcm,
 				silence,
-				player->period
+				PERIOD
 			);
 			continue;
 		}

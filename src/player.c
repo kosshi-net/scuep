@@ -195,9 +195,6 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 {
 	struct PlayerState *this = player;
 
-	this->period      = 1024;
-	this->frames      = this->period * 215;
-
 	if (this->channels    != param->ch_layout.nb_channels
 	||  this->sample_rate != param->sample_rate
 	||  this->format      != param->format
@@ -213,10 +210,12 @@ int player_reconfig(AVCodecParameters *param, bool flush)
 			this->data = NULL;
 		}
 
+
 		this->channels    = param->ch_layout.nb_channels;
 		this->sample_rate = param->sample_rate;
 		this->format      = param->format;
 
+		this->frames        = this->sample_rate * 5;    /* 5 second buffer */
 		this->sizeof_sample = av_get_bytes_per_sample(param->format);
 		this->sizeof_frame  = this->sizeof_sample * this->channels;
 		this->size          = this->frames * this->sizeof_frame;

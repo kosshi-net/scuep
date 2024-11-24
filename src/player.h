@@ -46,36 +46,53 @@ struct PlayerState {
 
 	_Atomic bool pause;
 
-	uint8_t *data;
-	size_t size;
+	uint8_t *data;  /* Ring buffer */
+	size_t   size;  /* Total buffer size in bytes */
 
 	uint32_t channels;
 	uint32_t sample_rate;
-	uint32_t period;
-	uint32_t frames; /* Frame lenght of ring buffer */
+	uint32_t frames; /* Frame length of ring buffer */
 
 	uint32_t sizeof_frame;
 	uint32_t sizeof_sample;
 
 	bool preload_failed;
 
-	/* Atomics accessed locklessly, make sure value changes mid-function are
-	   not an issue, eg sample and cache the values. Make sure to do full
-	   writes.
+	/* 
+	 * Atomics accessed locklessly, make sure writes don't have races
+	 * TODO investigate where atomics are actually necessary
+	 *
+	 * Head - Decoder
+	 *   - Written to by decoder, read by audio thread
+	 * Tail - Playing audio
+	 *   - Written to and read only by audio thread
+	 *
+	 * Position etc information on frontend should be displayed from tail's
+	 * status. Head can be decoding an entirely different track, a lot of
+	 * metadata stored here to keep track of that.
+	 *
+	 * Ring buffer
+	 * ring  - Frame position in ring buffer
+	 * total - Total frames decoded,
+	 *
+	 * head.stream_changed - When stream last changed, in total frame position
+	 * tail.stream_changed - When stream will change, in total frame position
+	 *
+	 * When tail.total reaches head.stream_changed, head metadata is copied
+	 * to tail.
+	 *
+	 * state_key - tracking id for the frontend
+	 * stream_offset - Used to store the seek offset to calculate true progress
+	 * stream_lenght - Lenght of current stream in frames
+	 */
 
-	   TODO investigate where atomics are actually necessary
-	*/
-
-
-	/* Head - the currently decoding track, can differ from tail */
 	struct {
-		TrackId  track_id;
-		/* state_key is tracking data for the frontend */
-		uint32_t state_key;
-
-		_Atomic uint64_t ring;          // Position in ring buffer
-		_Atomic uint64_t total;         // Total frames decoded
+		_Atomic uint64_t ring;
+		_Atomic uint64_t total;
 		_Atomic bool     done;
+
+		_Atomic TrackId  track_id;
+		_Atomic uint32_t state_key;
 
 		_Atomic uint64_t stream_changed;
 		_Atomic uint64_t stream_offset;
@@ -83,14 +100,13 @@ struct PlayerState {
 
 	} head;
 
-	/* Tail - the currently playing track */
 	struct {
-		TrackId  track_id;
-		uint32_t state_key;
-
 		_Atomic uint64_t ring;
-		_Atomic uint64_t total;          // Total frames played
+		_Atomic uint64_t total;
 		_Atomic bool     done;
+
+		_Atomic TrackId  track_id;
+		_Atomic uint32_t state_key;
 
 		_Atomic uint64_t stream_changed;
 		_Atomic uint64_t stream_offset;
