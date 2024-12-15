@@ -331,7 +331,23 @@ void load_playlist(char *playlist)
 		if(!track.artist) track.artist = "";
 
 		/* If metadata failed to load, use filename instead */
-		if( !track.title[0] )  track.title = scuep_basename(uri);
+		if (!track.title[0])  track.title = scuep_basename(uri);
+
+		/* Make missing album the name of the parent folder */
+		if (!track.album[0]) {
+			char *dir = scuep_dirname(uri);
+			char *c = dir;
+			int slashnum = 0;
+			while (*c) slashnum += *c++ == '/';
+			if (slashnum >= 2) {
+				c--;
+				*c-- = 0;
+				while (*c != '/') c--;
+				track.album = scuep_strdup(c+1);
+			}
+			free(dir);
+		}
+
 		log_info( "%s // %s // %s // %i - %is, #%i\n", \
 			track.title,
 			track.artist,
