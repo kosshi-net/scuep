@@ -22,14 +22,13 @@ Note: Some listed features may be incomplete or buggy
 - Vi-like commands
 - Vi-like search
 - Playlist editing and deduplication features
-- Solid unicode support
+- Unicode support
 
 Unimplemented features
 - Many legacy commands
 - Volume control
 - Some playlist editing functions
     - Reordering
-	- Write-to-file commands
 	- In-player deduplication command
 - Configuration
 
@@ -52,6 +51,7 @@ Other issues, bugs, & TODO
 - More precise searching options (eg. album name only search, etc)
 - Manuals
 - Better shell system with tab completition
+- Mysterious bug pins a cpu core to 100% when a track has been paused for a long time
 
 ## Documentation
 TODO. See legacy branch for more information.
@@ -65,7 +65,7 @@ TODO. See legacy branch for more information.
 | Enter          | Play selected item |
 | z              | Play previous |
 | c              | Toggle play/pause |
-| v              | Stop playback. Unitializes decoder and audio driver, minimizing idle resource usage |
+| v              | Stop playback. Unitializes decoder and audio driver, minimizes idle resource usage |
 | b              | Play next |
 | :              | Enter command (see Commands)  |
 | /              | Search |
@@ -89,6 +89,11 @@ with `scuep-remote`, or by piping them into `~/.config/scuep/fifo`.
 | `prev`            | Previous track |
 | `noh`             | Clears search highlighting  |
 | `m/<term>`        | Mark by search |
+| `append <file>`, `a` | Write marked items to a file |
+| `push`            | Stashes away current marks to a stack |
+| `pop`             | Retrieves marks from the stack, or clears current marks |
+
+Path arguments parse environment variables and the other usual shell shortcuts, such as `~`.
 
 ### Command line arguments
 | Flag | Function |
