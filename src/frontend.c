@@ -563,6 +563,20 @@ void frontend_print(uint32_t color, const char *msg)
 	this.cmd.prefix_color = color;
 }
 
+void frontend_printf(uint32_t color, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	static char buffer[1024];
+
+	vsnprintf(buffer, sizeof(buffer)-1, format, args);
+	va_end(args);
+
+	prompt_clear();
+	prompt_set_prefix(buffer);
+	this.cmd.prefix_color = color;
+}
+
 
 void prompt_delete(int32_t pos)
 {
