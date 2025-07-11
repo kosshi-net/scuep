@@ -347,6 +347,7 @@ void input(void)
 
 void input_default(int key)
 {
+
 	switch (key) {
 		case ':':
 			prompt_clear();
@@ -371,11 +372,13 @@ void input_default(int key)
 
 		case 'm':
 			{
+				int mark_bit = 1<<markstack_index();
+
 				int mark = playlist_get_mark(this.cursor);
-				if (mark > 0)
-					playlist_set_mark(this.cursor, 0);
+				if (mark & mark_bit)
+					playlist_and_mark(this.cursor, ~mark_bit);
 				else if (mark == 0)
-					playlist_set_mark(this.cursor, 1);
+					playlist_or_mark(this.cursor, mark_bit);
 
 				queue_redraw(ELEMENT_CAROUSEL);
 			}
@@ -387,11 +390,14 @@ void input_default(int key)
 			break;
 
 		case 'D':
-			if (playlist_delete_marked(1) == 0) {
-				playlist_delete(this.cursor);
+			{
+				int mark_bit = 1<<markstack_index();
+				if (playlist_delete_marked(mark_bit) == 0) { // TODO
+					playlist_delete(this.cursor);
+				}
+				this.playlist_items = playlist_count();
+				queue_redraw(ELEMENT_ALL);
 			}
-			this.playlist_items = playlist_count();
-			queue_redraw(ELEMENT_ALL);
 			break;
 
 		case '\n':
@@ -661,6 +667,8 @@ void frontend_search(int dir)
 
 void frontend_mark_by_search(const char *needle)
 {
+	int mark_bit = 1<<markstack_index();
+
 	if (needle[0] == '\0') return;
 
 	for (uint32_t i = 0; i < this.playlist_items; i++) {
@@ -675,7 +683,7 @@ void frontend_mark_by_search(const char *needle)
 		track_free(track);
 
 		if (match) {
-			playlist_set_mark(i, 1);
+			playlist_or_mark(i, mark_bit);
 		}
 	}
 
@@ -732,6 +740,12 @@ void cursor_lock(void)
 void cursor_free(void)
 {
 	this.cursor_locked = false;
+}
+
+
+uint32_t frontend_get_cursor(void)
+{
+	return this.cursor;
 }
 
 
@@ -866,6 +880,8 @@ void draw_carousel(void)
 	int center = MIN((term_rows-1)/2, this.cursor+layout.carousel[0]);
 	int row = 0;
 
+	int mark_bit = 1<<(markstack_index());
+
 	for (int i = this.cursor-center; i < items; i++) {
 		int flags = 0;
 
@@ -882,7 +898,7 @@ void draw_carousel(void)
 		move(row, 0);
 		clrtoeol();
 
-		if (mark > 0) {
+		if (mark&mark_bit) {
 			mvprintw(row, 2, "*");
 		}
 

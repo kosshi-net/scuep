@@ -84,6 +84,11 @@ void shell_run(const char* cmd)
 		return;
 	}
 
+	if (scuep_prefix("debug.marks", cmd)) {
+		int mark = playlist_get_mark(frontend_get_cursor());
+		frontend_printf(SCUEP_DEBUG, "%x", mark);
+		return;
+	}
 
 	if (scuep_prefix("debug.wordexp ", cmd)) {
 		const char *path = parse_path(arg);
@@ -98,6 +103,8 @@ void shell_run(const char* cmd)
 	||  scuep_prefix("a ", cmd)
 	) {
 		/* TODO Deduplication, don't write uris already in the file */
+
+		int mark_bit = 1<<markstack_index();
 
 		const char *path = parse_path(arg);
 		if (!path) return;
@@ -117,8 +124,7 @@ void shell_run(const char* cmd)
 		 * marked tracks directly */
 		for (int i = 0; i < tracks; i++) {
 
-			/* TODO replace the 1 with "mark stack index" */
-			if (playlist_get_mark(i) != 1)
+			if (!(playlist_get_mark(i) & mark_bit))
 				continue;
 
 			TrackId id = playlist_track(i);
@@ -141,10 +147,17 @@ void shell_run(const char* cmd)
 		return;
 	}
 
+	if (scuep_prefix("push", cmd)) {
+		markstack_push();
+		return;
+	}
+
+	if (scuep_prefix("pop", cmd)) {
+		markstack_pop();
+		return;
+	}
+
 	/* TODO Commands to be added TODO
-	 *
-	 * push, pop
-	 *   Stack for marks
 	 *
 	 * mfile
 	 *   Read marks from a file
@@ -152,7 +165,7 @@ void shell_run(const char* cmd)
 	 * volume
 	 *   Change playback volume
 	 *
-	 *
+	 * Many more I forgot
 	 */
 
 

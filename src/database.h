@@ -2,6 +2,7 @@
 #define SCUEP_DATABASE_H
 
 #include <stdint.h>
+#include <sqlite3.h>
 
 typedef int TrackId;
 
@@ -64,6 +65,14 @@ int playlist_delete_marked(int mark);
 
 int    playlist_get_mark(int);
 int    playlist_set_mark(int, int);
+int    playlist_and_mark(int, int);
+int    playlist_or_mark(int, int);
 
+int prepare (sqlite3_stmt **stmt, const char *sql);
+
+
+int  markstack_index();
+void markstack_pop();
+void markstack_push();
 
 #endif

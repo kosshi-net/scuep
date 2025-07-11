@@ -2,7 +2,7 @@ CREATE TABLE playlist (
 	id              INTEGER         NOT NULL    PRIMARY KEY,
 	ordinal         INTEGER         NOT NULL,
 	track_id        INTEGER         NOT NULL,
-	mark            INTEGER,
+	mark            INTEGER         NOT NULL,
 	FOREIGN KEY (track_id) REFERENCES tracks (id)
 );
 

@@ -17,7 +17,7 @@ static int db_prepare();
 static int db_stmt_finalize_all();
 
 /* Increment to reset existing databases */
-#define SCUEP_FORMAT_VERSION 3
+#define SCUEP_FORMAT_VERSION 4
 
 static char    *path_database;
 static sqlite3 *db;
@@ -240,8 +240,9 @@ int playlist_clear(void)
 		NULL // TODO add errmsg
 	);
 
-	return db_intvar_store("plc", 0);
-	return (rc != SQLITE_OK );
+	db_intvar_store("plc", 0);
+	db_intvar_store("mark_index", 0);
+	return 0;
 }
 
 
@@ -267,7 +268,7 @@ int playlist_push(TrackId id)
 	int rc;
 	static sqlite3_stmt *stmt;
 	rc = prepare(&stmt,
-		"INSERT INTO playlist(track_id, ordinal) VALUES (?1, ?2)"
+		"INSERT INTO playlist(track_id, ordinal, mark) VALUES (?1, ?2, 0)"
 	);
 	int plc = playlist_count();
 	rc = sqlite3_bind_int(stmt, 1, id);
@@ -326,7 +327,7 @@ int playlist_delete_marked(int mark)
 	static sqlite3_stmt *stmt;
 
 	/* TODO bitwise op */
-	rc = prepare(&stmt, "SELECT ordinal FROM playlist WHERE mark = ?1");
+	rc = prepare(&stmt, "SELECT ordinal FROM playlist WHERE mark & ?1 > 0");
 	if (rc != SQLITE_OK) goto error;
 
 	sqlite3_bind_int(stmt, 1, mark);
@@ -392,6 +393,49 @@ int playlist_set_mark(int index, int mark)
 	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
 	return -1;
 }
+
+int playlist_or_mark(int index, int mark)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+	rc = prepare(&stmt,
+		"UPDATE playlist SET mark = (mark | ?1) WHERE ordinal=?2"
+	);
+	if(rc != SQLITE_OK) goto error;
+
+	sqlite3_bind_int(stmt, 1, mark);
+	sqlite3_bind_int(stmt, 2, index);
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
+
+	return 0;
+
+	error:
+	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
+
+int playlist_and_mark(int index, int mark)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+	rc = prepare(&stmt,
+		"UPDATE playlist SET mark = (mark & ?1) WHERE ordinal=?2"
+	);
+	if(rc != SQLITE_OK) goto error;
+
+	sqlite3_bind_int(stmt, 1, mark);
+	sqlite3_bind_int(stmt, 2, index);
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
+
+	return 0;
+
+	error:
+	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
+
 
 
 TrackId track_by_uri( const char* uri )
@@ -605,4 +649,40 @@ int track_store( struct ScuepTrack *track )
 	fprintf(stderr, "Store error: %s\n", sqlite3_errmsg(db));
 	return -1;
 }
+
+
+
+int markstack_index()
+{
+	return db_intvar_load("mark_index");
+}
+
+void markstack_pop() {
+
+	int index = markstack_index();
+
+	int rc;
+	static sqlite3_stmt *stmt;
+	rc = prepare(&stmt,
+		"UPDATE playlist SET mark = mark & ?1"
+	);
+	if (rc != SQLITE_OK) goto error;
+
+	sqlite3_bind_int(stmt, 1, ~(1<<index) );
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
+
+	db_intvar_store("mark_index", MAX(index-1, 0));
+
+	return;
+
+	error:
+	return;
+}
+
+void markstack_push() {
+	int index = markstack_index();
+	db_intvar_store("mark_index", MIN(index+1, 30));
+}
+
 
