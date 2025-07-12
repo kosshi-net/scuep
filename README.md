@@ -71,7 +71,7 @@ TODO. See legacy branch for more information.
 | /              | Search |
 | n, N           | Find next or prev track matching search |
 | m              | Mark or unmark track |
-| D              | Delete track(s) from playlist |
+| D              | Delete marked tracks from playlist |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
 | d              | (DEBUG) Toggle debug panel |
@@ -82,16 +82,18 @@ TODO. See legacy branch for more information.
 These commands can be ran from the TUI by pressing `:`,
 with `scuep-remote`, or by piping them into `~/.config/scuep/fifo`.
 
-| Command           | Action |
-| ---               | --- |
-| `toggle` `pause`  | Toggles play/pause of playback |
-| `next` `skip`     | Skip track |
-| `prev`            | Previous track |
-| `noh`             | Clears search highlighting  |
-| `m/<term>`        | Mark by search |
+| Command              | Action |
+| ---                  | --- |
+| `toggle` `pause`     | Toggles play/pause of playback |
+| `next` `skip`        | Skip track |
+| `prev`               | Previous track |
+| `noh`                | Clears search highlighting  |
+| `m/<term>`           | Mark by search |
 | `append <file>`, `a` | Write marked items to a file |
-| `push`            | Stashes away current marks to a stack |
-| `pop`             | Retrieves marks from the stack, or clears current marks |
+| `dedup`              | Mark all duplicate tracks in the playlist |
+| `push`               | Stashes away current marks to a stack |
+| `pop`                | Retrieves marks from the stack, or clears current marks |
+| `delete`             | Deletes marked tracks from playlist |
 
 Path arguments parse environment variables and the other usual shell shortcuts, such as `~`.
 

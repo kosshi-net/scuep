@@ -437,6 +437,42 @@ int playlist_and_mark(int index, int mark)
 }
 
 
+int playlist_mark_dupes(int mark)
+{
+	int rc;
+	static sqlite3_stmt *stmt;
+
+	int len = playlist_count();
+	transaction_begin();
+	for (int i = 0; i < len; i++) {
+		rc = prepare(&stmt,
+			"UPDATE playlist SET mark = (mark | ?1) WHERE track_id = ?2 AND ordinal > ?3"
+		);
+		if(rc != SQLITE_OK) goto error;
+
+		TrackId track_id = playlist_track(i);
+		sqlite3_bind_int(stmt, 1, mark);
+		sqlite3_bind_int(stmt, 2, track_id);
+		sqlite3_bind_int(stmt, 3, i);
+		if (sqlite3_step(stmt) != SQLITE_DONE) goto error;
+	}
+
+	transaction_end();
+
+	return 0;
+
+	error:
+	transaction_end();
+	fprintf(stderr, "Sqlite error: %s\n", sqlite3_errmsg(db));
+	return -1;
+}
+
+
+
+
+
+
+
 
 TrackId track_by_uri( const char* uri )
 {

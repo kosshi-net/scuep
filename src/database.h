@@ -67,6 +67,7 @@ int    playlist_get_mark(int);
 int    playlist_set_mark(int, int);
 int    playlist_and_mark(int, int);
 int    playlist_or_mark(int, int);
+int    playlist_mark_dupes(int mark);
 
 int prepare (sqlite3_stmt **stmt, const char *sql);
 

@@ -154,6 +154,11 @@ void shell_run(const char* cmd)
 		return;
 	}
 
+	if (scuep_prefix("dedup", cmd)) {
+		playlist_mark_dupes( 1<<markstack_index() );
+		return;
+	}
+
 	if (scuep_prefix("push", cmd)) {
 		markstack_push();
 		return;
@@ -161,6 +166,17 @@ void shell_run(const char* cmd)
 
 	if (scuep_prefix("pop", cmd)) {
 		markstack_pop();
+		return;
+	}
+
+	if (scuep_prefix("delete", cmd)) {
+		uint32_t cursor = frontend_get_cursor();
+		transaction_begin();
+		int mark_bit = 1<<markstack_index();
+		if (playlist_delete_marked(mark_bit) == 0) {
+			playlist_delete(cursor);
+		}
+		transaction_end();
 		return;
 	}
 
