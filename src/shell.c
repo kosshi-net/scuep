@@ -32,6 +32,13 @@ char *parse_path(const char *arg)
 	return p.we_wordv[0];
 }
 
+void print_track_to_file(FILE *fp, TrackId id)
+{
+	struct ScuepTrack *track = track_load(id);
+	fprintf(fp, "%s\n", track->uri);
+	track_free(track);
+}
+
 void shell_run(const char* cmd)
 {
 	/* TODO: This is a very crude placeholder command driver. Make a proper
@@ -127,19 +134,19 @@ void shell_run(const char* cmd)
 			if (!(playlist_get_mark(i) & mark_bit))
 				continue;
 
-			TrackId id = playlist_track(i);
-			struct ScuepTrack *track = track_load(id);
-
-			fprintf(fp, "%s\n", track->uri);
-
+			print_track_to_file(fp, playlist_track(i));
 			written_count++;
-			track_free(track);
 		}
-		/* TODO if written_count=0, write frontend's hovered track */
+
+		if (written_count == 0) {
+			uint32_t i = frontend_get_cursor();
+			print_track_to_file(fp, playlist_track(i));
+			written_count++;
+		}
 
 		frontend_printf(SCUEP_INFO, "Wrote %i line%s to %s",
 				written_count,
-				written_count==1 ? "s" : "",
+				written_count==1 ? "" : "s",
 				path
 			);
 
