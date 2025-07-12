@@ -391,10 +391,12 @@ void input_default(int key)
 
 		case 'D':
 			{
+				transaction_begin();
 				int mark_bit = 1<<markstack_index();
-				if (playlist_delete_marked(mark_bit) == 0) { // TODO
+				if (playlist_delete_marked(mark_bit) == 0) {
 					playlist_delete(this.cursor);
 				}
+				transaction_end();
 				this.playlist_items = playlist_count();
 				queue_redraw(ELEMENT_ALL);
 			}
