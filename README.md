@@ -73,6 +73,8 @@ TODO. See legacy branch for more information.
 | D              | Delete marked tracks from playlist |
 | Esc            | Cancel search/command, refocus on currently playing file |
 | Left, Right    | Seek 5 seconds |
+| g              | Jump to top |
+| G              | Jump to bottom |
 | d              | (DEBUG) Toggle debug panel |
 | L              | (DEBUG) Force preload a track for gapless playback |
 

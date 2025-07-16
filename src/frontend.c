@@ -464,6 +464,15 @@ void input_default(int key)
 			this.should_quit = true;
 			break;
 
+		case 'g':
+			this.cursor = 0;
+			queue_redraw(ELEMENT_CAROUSEL);
+			break;
+		case 'G':
+			this.cursor = this.playlist_items-1;
+			queue_redraw(ELEMENT_CAROUSEL);
+			break;
+
 		case '1': case '2': case '3':
 		case '4': case '5': case '6':
 		case '7': case '8': case '9':
