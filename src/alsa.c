@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include <alsa/asoundlib.h>
+#include <alsa/error.h>
 #include <libavcodec/avcodec.h>
 
 #include <stdint.h>
@@ -78,7 +79,7 @@ int alsa_open(struct PlayerState *_player)
 	player->sndsvr_close = alsa_close;
 	thrd_create(&thread, &alsa_loop, NULL);
 
-	log_info("Alsa open OK");
+	log_info("ALSA open OK");
 
 	return 0;
 	error:
@@ -105,7 +106,7 @@ int alsa_close(void)
 
 int alsa_loop(void*arg)
 {
-	log_info("ALSA Thread open");
+	log_info("ALSA thread open");
 	thread_run = 1;
 
 	player->tail.track_id       = player->head.track_id;
@@ -137,10 +138,11 @@ int alsa_loop(void*arg)
 		total = MIN(total, player->frames - tail);
 
 		if (total < 1 ||  player->pause) {
-			snd_pcm_writei(pcm,
+			frames = snd_pcm_writei(pcm,
 				silence,
 				PERIOD
 			);
+			if (frames < 0) goto recover;
 			continue;
 		}
 
@@ -150,26 +152,25 @@ int alsa_loop(void*arg)
 				player->data + tail * player->sizeof_frame,
 				total
 			);
-			if (frames < 0) break;
+			if (frames < 0) goto recover;
 			total -= frames;
-		}
-
-		if (frames < 0) {
-			// TODO Proper error handling !
-			log_error("Alsa error %s", snd_strerror(frames));
-			//snd_pcm_prepare(pcm);
-			int ok = snd_pcm_recover(pcm, frames, 0);
-			if (!ok) {
-				log_error("Failed to recover. State undefined.");
-			}
-			continue;
 		}
 
 		tail += frames;
 		tail %= player->frames;
 		player->tail.ring = tail;
-
 		player->tail.total += frames;
+
+		continue;
+
+		recover:
+		{
+			const char *msg = snd_strerror(frames);
+			log_warn("ALSA error: %s", msg);
+			if (snd_pcm_recover(pcm, frames, 0) < 0) {
+				log_error("Failed to recover \"%s\". State undefined.", msg);
+			}
+		}
 	}
 
 	snd_pcm_drop(pcm);
@@ -178,7 +179,7 @@ int alsa_loop(void*arg)
 
 	player->sndsvr_close = NULL;
 	thread_run = 0;
-	log_info("ALSA Thread close");
+	log_info("ALSA thread close");
 	player->pause = 1;
 	return 0;
 }

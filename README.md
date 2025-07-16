@@ -51,7 +51,6 @@ Other issues, bugs, & TODO
 - More precise searching options (eg. album name only search, etc)
 - Manuals
 - Better shell system with tab completition
-- Mysterious bug pins a cpu core to 100% when a track has been paused for a long time
 
 ## Documentation
 TODO. See legacy branch for more information.
