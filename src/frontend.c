@@ -245,7 +245,7 @@ int frontend_tick(void)
 	uint32_t new_state = player_state_key();
 	if (new_state != -1 && prev_state != new_state) {
 		queue_redraw(ELEMENT_ALL);
-		if (this.cursor_locked) this.cursor = new_state;
+		if (this.cursor_locked) this.cursor = playlist_ordinal(new_state);
 	}
 	prev_state = new_state;
 
@@ -263,8 +263,8 @@ int frontend_tick(void)
 		else
 		if (player->head.done && !player->preload_failed) {
 			/* Preload next track */
-			uint32_t id = (this.playlist_items+player_state_key()+1) % this.playlist_items;
-			player_load( playlist_track(id), id, true);
+			uint32_t ordinal = (this.playlist_items+playlist_ordinal(player_state_key())+1) % this.playlist_items;
+			player_load( playlist_track(ordinal), playlist_key(ordinal), true);
 		}
 	}
 
@@ -307,6 +307,9 @@ void poll_remote(void)
 		head++;
 	}
 }
+
+
+
 
 
 /*
@@ -709,19 +712,19 @@ void frontend_mark_by_search(const char *needle)
 */
 
 
-void frontend_play(int id)
+void frontend_play(int ordinal)
 {
-	player_load( playlist_track(id), id, false );
+	player_load( playlist_track(ordinal), playlist_key(ordinal), false );
 	player_play();
 
 	if (this.cursor_locked) {
-		this.cursor = id;
+		this.cursor = ordinal;
 	}
 }
 
 void frontend_next(int32_t num)
 {
-	int32_t item = player_state_key() + num;
+	int32_t item = playlist_ordinal(player_state_key()) + num;
 	item = (this.playlist_items + item) % this.playlist_items;
 	frontend_play(item);
 }
@@ -741,7 +744,7 @@ void cursor_lock(void)
 	int32_t key = player_state_key();
 	if (key < 0) return;
 	this.cursor_locked = true;
-	this.cursor = key;
+	this.cursor = playlist_ordinal(key);
 }
 
 
@@ -890,6 +893,8 @@ void draw_carousel(void)
 
 	int mark_bit = 1<<(markstack_index());
 
+	int playlist_playing_id = player_state_key();
+
 	for (int i = this.cursor-center; i < items; i++) {
 		int flags = 0;
 
@@ -915,7 +920,7 @@ void draw_carousel(void)
 			flags |= CAROUSEL_PRINT_FOCUSED;
 		}
 
-		if (i == player_state_key()) {
+		if (playlist_playing_id == playlist_key(i)) {
 			mvprintw( row, 1, ">" );
 		}
 

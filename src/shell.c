@@ -173,20 +173,20 @@ void shell_run(const char* cmd)
 
 		uint32_t cursor = frontend_get_cursor();
 		int mark_bit = 1<<markstack_index();
-		uint32_t state_key = player_state_key();
 
-		if (playlist_get_mark(state_key) & mark_bit) {
-			player_stop();
-		}
 
 		transaction_begin();
 		if (playlist_delete_marked(mark_bit) == 0) {
-			if (cursor == state_key) {
-				player_stop();
-			}
 			playlist_delete(cursor);
 		}
 		transaction_end();
+
+		/* Check if currently playing track was deleted */
+		uint32_t state_key = player_state_key();
+		if (playlist_ordinal(state_key) < 0) {
+			player_stop();
+		}
+
 		return;
 	}
 

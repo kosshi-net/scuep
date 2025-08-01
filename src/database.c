@@ -262,6 +262,31 @@ TrackId playlist_track(int row)
 	return sqlite3_column_int(stmt, 0);
 }
 
+int playlist_key(int ordinal)
+{
+	if (ordinal < 0) return -1;
+	static sqlite3_stmt *stmt;
+
+	prepare(&stmt, "SELECT id FROM playlist WHERE ordinal=?1");
+	sqlite3_bind_int(stmt, 1, ordinal);
+	sqlite3_step(stmt);
+
+	return sqlite3_column_int(stmt, 0);
+}
+
+int playlist_ordinal(int key)
+{
+	if (key < 0) return -1;
+	static sqlite3_stmt *stmt;
+
+	prepare(&stmt, "SELECT ordinal FROM playlist WHERE id=?1");
+	sqlite3_bind_int(stmt, 1, key);
+	int ret = sqlite3_step(stmt);
+	if (ret == SQLITE_ROW)
+		return sqlite3_column_int(stmt, 0);
+	else
+		return -1;
+}
 
 int playlist_push(TrackId id)
 {

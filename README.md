@@ -44,8 +44,6 @@ Other issues, bugs, & TODO
 - Undefined behavior when gaplessly playing tracks shorter than the ring buffer
     - Or when stacking track preloads in general
 - Various UI improvements needed
-    - Cursor behavior is erratic and laggy since gapless playback was implemented
-	- Cursor position is wrong when deletions occur (fix: use id instead of ordinal)
 - A lot more testing needed
     - Not tested on other \*nixes
 - More precise searching options (eg. album name only search, etc)

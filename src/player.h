@@ -81,7 +81,7 @@ struct PlayerState {
 	 * When tail.total reaches head.stream_changed, head metadata is copied
 	 * to tail.
 	 *
-	 * state_key - tracking id for the frontend
+	 * state_key     - Arbitrary "txid" value for frontend tracking.
 	 * stream_offset - Used to store the seek offset to calculate true progress
 	 * stream_lenght - Lenght of current stream in frames
 	 */

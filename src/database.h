@@ -32,6 +32,22 @@ struct ScuepTrack {
  * function. Every other query/find etc returns a TrackId.
  */
 
+/*
+ * Refer to sql/schema.sql
+ *
+ * Playlist items have several identifiers:
+ * id/key
+ *   The only unique unchanging key.
+ *
+ * ordinal
+ *   Order in playlist. Can and will change when deletions occur.
+ *
+ * track_id
+ *   "Pointer" to the actual track the item represents. Multiple playlist items
+ *   can point to the same track.
+ *
+ * */
+
 struct ScuepTrack *track_load ( TrackId );
 
 int track_store( struct ScuepTrack *);
@@ -59,6 +75,9 @@ int     playlist_count(void);
 int     playlist_clear(void);
 int     playlist_push (TrackId);
 TrackId playlist_track(int);
+
+int     playlist_key    (int ordinal);
+int     playlist_ordinal(int key);
 
 void    playlist_delete(int);
 int playlist_delete_marked(int mark);
