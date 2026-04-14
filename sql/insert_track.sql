@@ -1,13 +1,13 @@
 INSERT INTO tracks (
 	uri,
 	basename,
-	title, 
+	title,
 	artist_id,
 	album_id,
 	pcm_start,
 	pcm_length,
 	pcm_chapter,
-	bitmask,
+	bitmask
 ) VALUES (
 	?1,
 	?2,
@@ -17,5 +17,5 @@ INSERT INTO tracks (
 	?6,
 	?7,
 	?8,
-	?9,
+	?9
 );
