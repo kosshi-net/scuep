@@ -196,7 +196,6 @@ int main(int argc, char **argv)
 #define CD_FRAMERATE 75
 
 #define MAX_STR_LEN 512
-#define MAX_PATH_LEN 512
 #define LOAD_PLAYLIST_INCLUDE 1
 #ifdef LOAD_PLAYLIST_INCLUDE
 
@@ -211,7 +210,7 @@ void load_playlist(char *playlist)
 	transaction_begin();
 
 	char clip[4096];
-	char path[MAX_PATH_LEN];
+	char path[4096];
 
 	char        *head = playlist;
 	const char  *tail = playlist;
@@ -267,10 +266,7 @@ void load_playlist(char *playlist)
 			}
 
 			// Copy path
-			int prot_len = strlen("cue://");
-			strncpy(path, clip+prot_len, MAX_PATH_LEN);
-			path[MAX_PATH_LEN-1] = '\0';
-
+			snprintf(path, sizeof(path), "%s", clip + strlen("cue://"));
 
 			char *string = scuep_read_file( path );
 			if(string == NULL) {
@@ -298,8 +294,7 @@ void load_playlist(char *playlist)
 		}
 		else
 		{ // Misc file, use taglib
-			strncpy(path, uri, MAX_PATH_LEN);
-			path[MAX_PATH_LEN-1] = '\0';
+			snprintf(path, sizeof(path), "%s", uri);
 			printf("%s\n", uri);
 
 
